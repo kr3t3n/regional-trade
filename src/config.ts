@@ -1,0 +1,108 @@
+/**
+ * V1 constants — EXACTLY from REGIONAL-TRADE.md "V1 constants" section.
+ * Do not invent mechanics that contradict the notebook.
+ */
+
+export type Good = 'grain' | 'ore' | 'timber' | 'fibre';
+export type RegionId = 'vale' | 'ridge' | 'cross';
+
+export const GOODS: Good[] = ['grain', 'ore', 'timber', 'fibre'];
+
+export const REGIONS: Record<
+  RegionId,
+  { id: RegionId; name: string; local: Good[]; foreign: Good[] }
+> = {
+  vale: {
+    id: 'vale',
+    name: 'Vale',
+    local: ['grain', 'fibre'],
+    foreign: ['ore', 'timber'],
+  },
+  ridge: {
+    id: 'ridge',
+    name: 'Ridge',
+    local: ['ore', 'timber'],
+    foreign: ['grain', 'fibre'],
+  },
+  cross: {
+    id: 'cross',
+    name: 'Cross',
+    local: ['grain', 'ore'],
+    foreign: ['timber', 'fibre'],
+  },
+};
+
+/** Harvest */
+export const HARVEST = {
+  clickAmount: 1,
+  idlePerSecond: 0.2,
+  energyCap: 30,
+  /** 1 energy every 2 seconds */
+  energyRegenSeconds: 2,
+  /** Node upgrade cost: 10 × 1.15^n of that local good */
+  nodeUpgradeBase: 10,
+  nodeUpgradeGrowth: 1.15,
+} as const;
+
+/** Travel times in seconds */
+export const TRAVEL_SECONDS: Record<string, number> = {
+  'vale-ridge': 25,
+  'ridge-vale': 25,
+  'vale-cross': 20,
+  'cross-vale': 20,
+  'ridge-cross': 20,
+  'cross-ridge': 20,
+};
+
+export const TRAVEL = {
+  cargoCap: 40,
+  /** Fee: 2 of a local good to depart */
+  feeAmount: 2,
+} as const;
+
+/** Workbench — first craft gate */
+export const WORKBENCH_COST: Partial<Record<Good, number>> = {
+  grain: 20,
+  ore: 20,
+};
+
+/**
+ * NPC market — hidden fair P = 1 coin for all goods in v1.
+ * Spread 30% around P.
+ * Local: NPC buys at 0.7P, sells at 1.3P
+ * Foreign: NPC sells missing at 1.15P, buys export at 1.05P
+ */
+export const NPC = {
+  fairPrice: 1,
+  localBuyMult: 0.7,
+  localSellMult: 1.3,
+  foreignBuyMult: 1.05,
+  foreignSellMult: 1.15,
+} as const;
+
+/** Client tick rate */
+export const TICK_HZ = 10;
+
+export function travelKey(from: RegionId, to: RegionId): string {
+  return `${from}-${to}`;
+}
+
+export function travelSeconds(from: RegionId, to: RegionId): number {
+  return TRAVEL_SECONDS[travelKey(from, to)] ?? 25;
+}
+
+/** NPC buy price (what NPC pays YOU when you sell to them) */
+export function npcBuyPrice(regionId: RegionId, good: Good): number {
+  const region = REGIONS[regionId];
+  const P = NPC.fairPrice;
+  if (region.local.includes(good)) return P * NPC.localBuyMult;
+  return P * NPC.foreignBuyMult;
+}
+
+/** NPC sell price (what YOU pay to buy FROM NPC) */
+export function npcSellPrice(regionId: RegionId, good: Good): number {
+  const region = REGIONS[regionId];
+  const P = NPC.fairPrice;
+  if (region.local.includes(good)) return P * NPC.localSellMult;
+  return P * NPC.foreignSellMult;
+}
