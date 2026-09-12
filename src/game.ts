@@ -1,10 +1,14 @@
 import {
   GOODS,
+  GOOD_LABEL,
+  REGION_IDS,
   REGIONS,
   HARVEST,
   TRAVEL,
   WORKBENCH_COST,
   TICK_HZ,
+  SAVE_KEY,
+  OFFLINE_CATCHUP_SECONDS,
   type Good,
   type RegionId,
   travelSeconds,
@@ -41,11 +45,11 @@ export interface GameState {
   log: string[];
 }
 
-function emptyInv(): Inventory {
+export function emptyInv(): Inventory {
   return { grain: 0, ore: 0, timber: 0, fibre: 0 };
 }
 
-function cloneInv(inv: Inventory): Inventory {
+export function cloneInv(inv: Inventory): Inventory {
   return { ...inv };
 }
 
@@ -54,11 +58,10 @@ function sumInv(inv: Inventory): number {
 }
 
 export function createInitialState(): GameState {
-  const stashes: Record<RegionId, Inventory> = {
-    vale: emptyInv(),
-    ridge: emptyInv(),
-    cross: emptyInv(),
-  };
+  const stashes = Object.fromEntries(REGION_IDS.map((id) => [id, emptyInv()])) as Record<
+    RegionId,
+    Inventory
+  >;
   const nodes: Record<RegionId, Partial<Record<Good, number>>> = {
     vale: { grain: 1, fibre: 1 },
     ridge: { ore: 1, timber: 1 },
@@ -74,7 +77,9 @@ export function createInitialState(): GameState {
     nodes,
     travel: null,
     workbenchCrafted: false,
-    log: ['Spawn Vale. Leave 20 grain home. Fee 2 + carry ~28 grain → Ridge. Sell grain (1.05), buy ore (local sell 1.3), fee timber/ore, return, craft.'],
+    log: [
+      'Spawn Vale. Leave 20 grain home. Fee 2 + carry ~28 grain → Ridge (25s), or hop Vale → Cross → Ridge (20s each). Sell grain (1.05), buy Ridge ore (local sell 1.3), return, craft.',
+    ],
   };
 }
 
@@ -331,5 +336,19 @@ export function craftWorkbench(state: GameState): boolean {
   return true;
 }
 
-export { GOODS, REGIONS, HARVEST, TRAVEL, WORKBENCH_COST, TICK_HZ, npcBuyPrice, npcSellPrice };
+export {
+  GOODS,
+  GOOD_LABEL,
+  REGION_IDS,
+  REGIONS,
+  HARVEST,
+  TRAVEL,
+  WORKBENCH_COST,
+  TICK_HZ,
+  SAVE_KEY,
+  OFFLINE_CATCHUP_SECONDS,
+  npcBuyPrice,
+  npcSellPrice,
+  travelSeconds,
+};
 export type { Good, RegionId };
