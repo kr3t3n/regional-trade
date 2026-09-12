@@ -14,6 +14,7 @@ import {
   travelSeconds,
   npcBuyPrice,
   npcSellPrice,
+  npcTradeTotal,
 } from './config';
 
 export type Inventory = Record<Good, number>;
@@ -283,9 +284,10 @@ export function sellToNpc(state: GameState, good: Good, amount: number): boolean
   const stash = state.stashes[state.region];
   if (stash[good] < amount) return false;
   const price = npcBuyPrice(state.region, good);
+  const credit = npcTradeTotal(price, amount);
   stash[good] -= amount;
-  state.coin += price * amount;
-  pushLog(state, `Sold ${amount} ${good} @ ${price.toFixed(2)} → +${(price * amount).toFixed(2)} coin.`);
+  state.coin += credit;
+  pushLog(state, `Sold ${amount} ${good} @ ${price.toFixed(2)} → +${credit.toFixed(2)} coin.`);
   return true;
 }
 
@@ -294,7 +296,7 @@ export function buyFromNpc(state: GameState, good: Good, amount: number): boolea
   if (!state.region || state.travel) return false;
   if (amount <= 0) return false;
   const price = npcSellPrice(state.region, good);
-  const cost = price * amount;
+  const cost = npcTradeTotal(price, amount);
   if (state.coin + 1e-9 < cost) {
     pushLog(state, `Need ${cost.toFixed(2)} coin to buy ${amount} ${good} (have ${state.coin.toFixed(2)}).`);
     return false;
@@ -349,6 +351,7 @@ export {
   OFFLINE_CATCHUP_SECONDS,
   npcBuyPrice,
   npcSellPrice,
+  npcTradeTotal,
   travelSeconds,
 };
 export type { Good, RegionId };

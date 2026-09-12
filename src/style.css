@@ -302,7 +302,69 @@ tr.local td:first-child {
 }
 
 .trade-amt {
-  margin-bottom: 0.4rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.75rem;
+  margin-bottom: 0.55rem;
+  padding: 0.45rem 0.6rem;
+  background: #f6efe0;
+  border: 1px solid #e4d8be;
+  border-radius: 6px;
+}
+
+.trade-amt label {
+  font-weight: 600;
+  font-size: 0.88rem;
+}
+
+.trade-amt input[type='number'] {
+  max-width: 5.5rem;
+}
+
+.trade-live-hint {
+  margin: 0;
+  flex: 1 1 12rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+th .th-sub {
+  display: block;
+  font-weight: 500;
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+
+.price {
+  vertical-align: top;
+}
+
+.price .unit {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.price .unit .per {
+  font-size: 0.68rem;
+}
+
+.price .total {
+  display: inline-block;
+  font-variant-numeric: tabular-nums;
+  font-size: 1rem;
+  letter-spacing: 0.01em;
+}
+
+.price .coin-lbl {
+  margin-left: 0.2rem;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.price.short .total {
+  color: #8a2b1a;
 }
 
 input[type='number'],

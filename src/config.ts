@@ -124,3 +124,11 @@ export function npcSellPrice(regionId: RegionId, good: Good): number {
   if (region.local.includes(good)) return P * NPC.localSellMult;
   return P * NPC.foreignSellMult;
 }
+
+/**
+ * Coin total for a coin-only NPC fill (no barter).
+ * Confirm and the live trade UI both use amount × per-unit price.
+ */
+export function npcTradeTotal(unitPrice: number, amount: number): number {
+  return unitPrice * amount;
+}

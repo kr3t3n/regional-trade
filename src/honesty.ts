@@ -14,6 +14,7 @@ import {
   buyFromNpc,
   npcSellPrice,
   npcBuyPrice,
+  npcTradeTotal,
   REGIONS,
   HARVEST,
   TRAVEL,
@@ -117,7 +118,7 @@ export function honestyReport(): string[] {
     errors.push('craft Workbench failed with 20/20 in Vale');
   }
 
-  // Sell/buy spreads: not 1:1
+  // Sell/buy spreads: not 1:1. Confirm = amount × unit (coin only, no barter).
   const m = createInitialState();
   m.region = 'ridge';
   m.stashes.ridge.grain = 10;
@@ -126,6 +127,24 @@ export function honestyReport(): string[] {
   buyFromNpc(m, 'ore', 1);
   if (Math.abs(m.stashes.ridge.ore - 1) > 1e-9) errors.push('buy 1 ore failed');
   if (Math.abs(m.coin - (10.5 - 1.3)) > 1e-9) errors.push(`after ore buy coin ${m.coin} ≠ 9.2`);
+
+  const bulkSellUnit = npcBuyPrice('ridge', 'grain');
+  const bulkBuyUnit = npcSellPrice('ridge', 'ore');
+  if (Math.abs(npcTradeTotal(bulkSellUnit, 4) - 4 * bulkSellUnit) > 1e-9) {
+    errors.push('npcTradeTotal must be amount × unit price');
+  }
+  const bulk = createInitialState();
+  bulk.region = 'ridge';
+  bulk.stashes.ridge.grain = 4;
+  sellToNpc(bulk, 'grain', 4);
+  if (Math.abs(bulk.coin - npcTradeTotal(bulkSellUnit, 4)) > 1e-9) {
+    errors.push(`sell confirm must credit amount × unit, got ${bulk.coin}`);
+  }
+  buyFromNpc(bulk, 'ore', 2);
+  const afterBuy = npcTradeTotal(bulkSellUnit, 4) - npcTradeTotal(bulkBuyUnit, 2);
+  if (Math.abs(bulk.coin - afterBuy) > 1e-9) {
+    errors.push(`buy confirm must spend amount × unit, got ${bulk.coin}`);
+  }
 
   installMemoryStorage();
   const saved = createInitialState();
