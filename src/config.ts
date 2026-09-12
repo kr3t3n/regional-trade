@@ -95,6 +95,17 @@ export const TICK_HZ = 10;
 /** localStorage key for solo persist */
 export const SAVE_KEY = 'regional-trade-v1';
 
+/** Helper overlay preference (not the game save). */
+export const HELP_KEY = 'regional-trade-helper';
+
+/**
+ * Promised after Workbench — copy only until #7 ships the real unlock.
+ * Does not change TRAVEL.cargoCap (still 40). Next recipe must spend a
+ * Vale-foreign good so the second trip stays honest.
+ */
+export const NEXT_RECIPE_NEEDS: Good = 'timber';
+export const WORKBENCH_UNLOCK_CARGO = 5;
+
 /**
  * Offline catch-up seconds. 0 = off (notebook: none in v1, or cap 5 min).
  * Do not invent generous catch-up — idle + travel while the tab is closed is how bots win.

@@ -33,6 +33,8 @@ Override either host with `VITE_BASE=/your/path/ npm run build`, or set `GITHUB_
 
 Progress (stash per region, nodes, coin, energy, region, in-transit cargo, Workbench) is saved to **localStorage** (`regional-trade-v1`). There is a **Reset save** button. Offline catch-up is **off**: closing the tab does not grant idle, energy, or travel credit.
 
+**Help** is a toggleable field-notes panel (harvest, travel, cargo, NPC spreads, coin, craft gates). It is distinct from the first Ridge trip tip. First visit opens it; after that it stays off unless you turn it back on (`regional-trade-helper`). Reset save does not clear that preference.
+
 ## Deploy `dist/` as static files
 
 This is a Vite SPA with no backend. Any static host works. A `*.pages.dev` URL is enough — do not buy a domain.
@@ -66,7 +68,7 @@ No server routes, no environment variables, no DNS changes required.
    **Two-hop tutorial:** Vale → **Cross** (20s) → Ridge (20s). No extra buildings; Cross is only a waypoint.
 4. At Ridge, open the **NPC market**. Change **Amount** — each row’s sell/buy **total** updates live (`amount × /ea`). Confirm **Sell** / **Buy** uses that same total (coin only; no barter). Sell grain (foreign buy **1.05P**). Buy ore — ore is local to Ridge so NPC sell is **1.3P** (not Travian 1:1). 28 grain → 29.4 coin → 22 ore.
 5. Keep 2 ore (or timber) for the return fee. Depart Vale with **20 ore** in cargo.
-6. In Vale, craft **Workbench** (20 grain left at home + 20 ore).
+6. In Vale, craft **Workbench** (20 grain left at home + 20 ore). The complete screen says the next recipe board + cargo +5 or local craft speed is promised; the next recipe still needs a foreign good (Timber). The real unlock is #7 — cargo cap stays 40.
 
 Honesty: cannot craft without leaving Vale (ore is foreign there); idle pauses in transit; arrival tick does not grant a full idle slice; NPC spreads stay in `src/config.ts`.
 
@@ -78,6 +80,8 @@ Honesty: cannot craft without leaving Vale (ore is foreign there); idle pauses i
 | `src/game.ts` | State + tick + actions |
 | `src/persist.ts` | localStorage save/load/reset (no offline catch-up) |
 | `src/main.ts` | One-screen UI (NPC totals = amount × unit, live) |
+| `src/help.ts` | Toggleable field-notes helper + localStorage pref |
+| `src/icons.ts` | SVG tiles for goods / regions / panels |
 | `vite.config.ts` | Dual `base`: `/games/trade/` or `/regional-trade/` |
 | `PLAN.md` | Later path to multiplayer + AI regional agents — not in this build |
 
