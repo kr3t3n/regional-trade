@@ -8,6 +8,15 @@ export type RegionId = 'vale' | 'ridge' | 'cross';
 
 export const GOODS: Good[] = ['grain', 'ore', 'timber', 'fibre'];
 
+export const REGION_IDS: RegionId[] = ['vale', 'ridge', 'cross'];
+
+export const GOOD_LABEL: Record<Good, string> = {
+  grain: 'Grain',
+  ore: 'Ore',
+  timber: 'Timber',
+  fibre: 'Fibre',
+};
+
 export const REGIONS: Record<
   RegionId,
   { id: RegionId; name: string; local: Good[]; foreign: Good[] }
@@ -82,6 +91,15 @@ export const NPC = {
 
 /** Client tick rate */
 export const TICK_HZ = 10;
+
+/** localStorage key for solo persist */
+export const SAVE_KEY = 'regional-trade-v1';
+
+/**
+ * Offline catch-up seconds. 0 = off (notebook: none in v1, or cap 5 min).
+ * Do not invent generous catch-up — idle + travel while the tab is closed is how bots win.
+ */
+export const OFFLINE_CATCHUP_SECONDS = 0;
 
 export function travelKey(from: RegionId, to: RegionId): string {
   return `${from}-${to}`;
