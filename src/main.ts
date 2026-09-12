@@ -47,18 +47,15 @@ function fmt(n: number): string {
   return n.toFixed(1);
 }
 
+const GOOD_GLYPH: Record<Good, string> = {
+  grain: '🌾',
+  ore: '🪨',
+  timber: '🪵',
+  fibre: '🧶',
+};
+
 function goodIcon(g: Good): string {
-  const title = GOOD_LABEL[g];
-  switch (g) {
-    case 'grain':
-      return `<svg class="ico grain" viewBox="0 0 16 16" aria-hidden="true"><title>${title}</title><path fill="#d4a017" d="M8 1.2c.5 2.2 1.8 3.6 3.3 4.2-1.8.5-3.1 1.8-3.3 4.1C7.8 7.2 6.5 5.9 4.7 5.4 6.2 4.8 7.5 3.4 8 1.2z"/><path fill="#8a7018" d="M7.55 8.2h.9V15h-.9z"/><path fill="#c4921a" d="M8 6.2c.45 1.6 1.5 2.6 2.7 3-1.4.35-2.5 1.3-2.7 2.8-.2-1.5-1.3-2.45-2.7-2.8 1.2-.4 2.25-1.4 2.7-3z"/></svg>`;
-    case 'ore':
-      return `<svg class="ico ore" viewBox="0 0 16 16" aria-hidden="true"><title>${title}</title><path fill="#6b7280" d="M3 10.5 6.2 4.2l4.1 1.3 2.7 5.2-3.4 3.1H5.2z"/><path fill="#9ca3af" d="M6.2 4.2 8.8 7.1 10.3 5.5z"/><path fill="#b45309" d="M7.1 9.2h1.6l.7 1.6-1.5.9-1.4-.8z"/></svg>`;
-    case 'timber':
-      return `<svg class="ico timber" viewBox="0 0 16 16" aria-hidden="true"><title>${title}</title><rect x="2" y="6.2" width="12" height="4.4" rx="2.1" fill="#8b5a2b"/><ellipse cx="2.6" cy="8.4" rx="1.4" ry="2.1" fill="#d4a574"/><ellipse cx="2.6" cy="8.4" rx=".6" ry="1.1" fill="#8b5a2b"/><path stroke="#6b4423" stroke-width=".6" d="M5.2 7.1h7.4M5.2 9.7h7.4" fill="none"/></svg>`;
-    case 'fibre':
-      return `<svg class="ico fibre" viewBox="0 0 16 16" aria-hidden="true"><title>${title}</title><path fill="none" stroke="#6b8f3a" stroke-width="1.4" stroke-linecap="round" d="M4 13c2-4 2-7 0-10"/><path fill="none" stroke="#8fa85a" stroke-width="1.4" stroke-linecap="round" d="M8 13c2-4 2-7 0-10"/><path fill="none" stroke="#4d6b28" stroke-width="1.4" stroke-linecap="round" d="M12 13c2-4 2-7 0-10"/><circle cx="4" cy="3" r="1.1" fill="#c4b56a"/><circle cx="8" cy="3" r="1.1" fill="#c4b56a"/><circle cx="12" cy="3" r="1.1" fill="#c4b56a"/></svg>`;
-  }
+  return `<span class="ico ${g}" title="${GOOD_LABEL[g]}" aria-hidden="true">${GOOD_GLYPH[g]}</span>`;
 }
 
 function goodChip(g: Good): string {
@@ -120,8 +117,8 @@ function goalBlock(): string {
     const have = here ? here[g] : 0;
     const ok = have + 1e-9 >= need;
     const other = elsewhere(g);
-    return `<span class="need ${ok ? 'ok' : ''}">${goodIcon(g)} ${fmt(have)}/${need}${
-      !ok && other ? ` <em>(${other})</em>` : ''
+    return `<span class="need ${ok ? 'ok' : ''}" data-goal="${g}">${goodIcon(g)} <span data-goal-have="${g}">${fmt(have)}</span>/${need}${
+      !ok && other ? ` <em data-goal-else="${g}">(${other})</em>` : `<em data-goal-else="${g}" hidden></em>`
     }</span>`;
   });
   return `<div class="goal"><span class="lbl">Workbench</span> ${parts.join('')}</div>`;
@@ -331,7 +328,11 @@ function render() {
             <button type="button" data-act="craft" ${craftErr ? 'disabled' : ''}>
               Craft Workbench (20 grain + 20 ore)
             </button>
-            ${craftErr && !state.workbenchCrafted ? `<p class="hint">${craftErr}</p>` : ''}
+            ${
+              state.workbenchCrafted
+                ? ''
+                : `<p class="hint" id="ui-craft-err">${craftErr ?? ''}</p>`
+            }
             ${state.workbenchCrafted ? '<p class="win">Loop complete.</p>' : ''}
           </section>
         `
@@ -391,6 +392,33 @@ function paintLive() {
     const stash = state.region ? state.stashes[state.region] : null;
     btn.disabled = cost === null || !stash || stash[g] < cost;
   });
+
+  const here = state.region && !state.travel ? state.stashes[state.region] : null;
+  for (const [g, need] of Object.entries(WORKBENCH_COST) as [Good, number][]) {
+    const have = here ? here[g] : 0;
+    const haveEl = document.querySelector(`[data-goal-have="${g}"]`);
+    if (haveEl) haveEl.textContent = fmt(have);
+    const needEl = document.querySelector(`[data-goal="${g}"]`);
+    if (needEl) needEl.classList.toggle('ok', have + 1e-9 >= need);
+    const elseEl = document.querySelector<HTMLElement>(`[data-goal-else="${g}"]`);
+    if (elseEl) {
+      const other = elsewhere(g);
+      if (other && have + 1e-9 < need) {
+        elseEl.hidden = false;
+        elseEl.textContent = `(${other})`;
+      } else {
+        elseEl.hidden = true;
+        elseEl.textContent = '';
+      }
+    }
+  }
+  const craftBtn = app.querySelector<HTMLButtonElement>('button[data-act="craft"]');
+  const craftErr = canCraftWorkbench(state);
+  if (craftBtn) craftBtn.disabled = !!craftErr;
+  const craftErrEl = document.getElementById('ui-craft-err');
+  if (craftErrEl && !state.workbenchCrafted) {
+    craftErrEl.textContent = craftErr ?? '';
+  }
 }
 
 function afterAction(full: boolean) {
