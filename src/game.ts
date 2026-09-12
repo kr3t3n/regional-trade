@@ -6,6 +6,8 @@ import {
   HARVEST,
   TRAVEL,
   WORKBENCH_COST,
+  NEXT_RECIPE_NEEDS,
+  WORKBENCH_UNLOCK_CARGO,
   TICK_HZ,
   SAVE_KEY,
   OFFLINE_CATCHUP_SECONDS,
@@ -334,7 +336,10 @@ export function craftWorkbench(state: GameState): boolean {
     stash[g] -= need;
   }
   state.workbenchCrafted = true;
-  pushLog(state, 'Crafted Workbench! Loop complete.');
+  pushLog(
+    state,
+    `Crafted Workbench. Next recipe board unlocks (still needs ${GOOD_LABEL[NEXT_RECIPE_NEEDS]}) plus cargo +${WORKBENCH_UNLOCK_CARGO} or local craft speed.`
+  );
   return true;
 }
 
@@ -346,6 +351,8 @@ export {
   HARVEST,
   TRAVEL,
   WORKBENCH_COST,
+  NEXT_RECIPE_NEEDS,
+  WORKBENCH_UNLOCK_CARGO,
   TICK_HZ,
   SAVE_KEY,
   OFFLINE_CATCHUP_SECONDS,

@@ -18,8 +18,11 @@ import {
   REGIONS,
   HARVEST,
   TRAVEL,
+  NEXT_RECIPE_NEEDS,
+  WORKBENCH_UNLOCK_CARGO,
 } from './game';
 import { saveGame, loadGame, resetGame, clearSave } from './persist';
+import { loadHelpOpen, saveHelpOpen } from './help';
 
 function installMemoryStorage() {
   const store = new Map<string, string>();
@@ -117,6 +120,12 @@ export function honestyReport(): string[] {
   if (!craftWorkbench(crafted) || !crafted.workbenchCrafted) {
     errors.push('craft Workbench failed with 20/20 in Vale');
   }
+  if (TRAVEL.cargoCap !== 40 || WORKBENCH_UNLOCK_CARGO !== 5) {
+    errors.push('Workbench must not apply cargo +5 until #7 (cap stays 40)');
+  }
+  if (!REGIONS.vale.foreign.includes(NEXT_RECIPE_NEEDS)) {
+    errors.push('next recipe must still spend a Vale-foreign good');
+  }
 
   // Sell/buy spreads: not 1:1. Confirm = amount × unit (coin only, no barter).
   const m = createInitialState();
@@ -147,6 +156,13 @@ export function honestyReport(): string[] {
   }
 
   installMemoryStorage();
+  if (!loadHelpOpen()) errors.push('helper should open on first visit');
+  if (loadHelpOpen()) errors.push('helper should default off after first open');
+  saveHelpOpen(true);
+  if (!loadHelpOpen()) errors.push('helper on preference not remembered');
+  saveHelpOpen(false);
+  if (loadHelpOpen()) errors.push('helper off preference not remembered');
+
   const saved = createInitialState();
   saved.stashes.vale.grain = 17;
   saved.stashes.ridge.ore = 4;
