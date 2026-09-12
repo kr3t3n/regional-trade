@@ -52,6 +52,10 @@ body::before {
   padding: 1rem 1rem 1.6rem;
 }
 
+body.helper-open .wrap {
+  padding-right: min(24.5rem, 42vw);
+}
+
 .top {
   display: flex;
   justify-content: space-between;
