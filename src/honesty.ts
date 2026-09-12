@@ -18,6 +18,26 @@ import {
   HARVEST,
   TRAVEL,
 } from './game';
+import { saveGame, loadGame, resetGame, clearSave } from './persist';
+
+function installMemoryStorage() {
+  const store = new Map<string, string>();
+  const memory = {
+    getItem(key: string) {
+      return store.has(key) ? store.get(key)! : null;
+    },
+    setItem(key: string, value: string) {
+      store.set(key, value);
+    },
+    removeItem(key: string) {
+      store.delete(key);
+    },
+  };
+  Object.defineProperty(globalThis, 'localStorage', {
+    configurable: true,
+    value: memory,
+  });
+}
 
 export function honestyReport(): string[] {
   const errors: string[] = [];
@@ -106,6 +126,32 @@ export function honestyReport(): string[] {
   buyFromNpc(m, 'ore', 1);
   if (Math.abs(m.stashes.ridge.ore - 1) > 1e-9) errors.push('buy 1 ore failed');
   if (Math.abs(m.coin - (10.5 - 1.3)) > 1e-9) errors.push(`after ore buy coin ${m.coin} ≠ 9.2`);
+
+  installMemoryStorage();
+  const saved = createInitialState();
+  saved.stashes.vale.grain = 17;
+  saved.stashes.ridge.ore = 4;
+  saved.coin = 3.5;
+  saved.energy = 11;
+  saved.nodes.vale.grain = 3;
+  saved.workbenchCrafted = false;
+  saveGame(saved);
+  const loaded = loadGame();
+  if (!loaded) errors.push('loadGame returned null after save');
+  else {
+    if (loaded.stashes.vale.grain !== 17) errors.push('persist lost Vale grain');
+    if (loaded.stashes.ridge.ore !== 4) errors.push('persist lost Ridge ore');
+    if (loaded.coin !== 3.5) errors.push('persist lost coin');
+    if (loaded.energy !== 11) errors.push('persist lost energy');
+    if (loaded.nodes.vale.grain !== 3) errors.push('persist lost node level');
+    if (loaded.region !== 'vale') errors.push('persist lost region');
+  }
+  const reset = resetGame();
+  if (reset.stashes.vale.grain !== 0 || reset.energy !== HARVEST.energyCap) {
+    errors.push('resetGame did not restore initial stash/energy');
+  }
+  if (loadGame() !== null) errors.push('reset left a localStorage snapshot');
+  clearSave();
 
   return errors;
 }
