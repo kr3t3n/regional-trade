@@ -2,7 +2,7 @@
 
 Playable one-loop prototype: **harvest local → travel → trade with NPC → craft Workbench**.
 
-Constants match `/workspace/games/REGIONAL-TRADE.md` (V1 constants). No invented mechanics.
+Constants match `REGIONAL-TRADE.md` (V1 constants). No invented mechanics.
 
 ## Run
 
@@ -22,13 +22,13 @@ npm run preview
 
 ## Play loop (intended)
 
-1. Spawn in **Vale**. Click **grain** (and optionally fibre). Energy: 30 clicks, regen 1 / 2s. Idle +0.2/s per node level while in-region.
-2. Stock ~22+ grain (20 cargo + 2 fee). Set cargo grain to 20, fee good grain, destination **Ridge**, **Depart** (25s). Idle pauses in transit.
-3. At Ridge, **sell** grain to NPC (buys foreign export at 1.05P), **buy** ore (sells foreign at 1.15P).
-4. Depart back to Vale with ore in cargo (fee: 2 ore or timber).
-5. In Vale, craft **Workbench** (20 grain + 20 ore). Grain left at home + ore brought back.
+1. Spawn in **Vale**. Click **grain**. Energy: 30 clicks, regen 1 / 2s. Idle +0.2/s × node level while in-region (pauses in transit).
+2. Stock ~50 grain: **leave 20 at home** for the craft, pay fee **2 grain**, carry **~28 grain** (cargo cap 40). Destination **Ridge**, **Depart** (25s).
+3. At Ridge, **sell** grain to NPC (foreign buy **1.05P**). **Buy ore** — ore is local to Ridge so NPC sell is **1.3P** (not Travian 1:1; notebook trip sketch used 1.15 by mistake — constants win). 28 grain → 29.4 coin → 22 ore.
+4. Idle a few seconds for **timber** if you want a non-ore fee, or keep 2 ore for the return fee. Depart Vale with **20 ore** in cargo.
+5. In Vale, craft **Workbench** (20 grain left at home + 20 ore).
 
-Honesty checks baked in: cannot craft Workbench without travelling (ore is foreign in Vale); idle pauses in transit; NPC is not Travian 1:1.
+Honesty: cannot craft without travelling (ore is foreign in Vale); idle pauses in transit; NPC is not 1:1.
 
 ## Files
 

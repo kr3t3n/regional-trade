@@ -74,7 +74,7 @@ export function createInitialState(): GameState {
     nodes,
     travel: null,
     workbenchCrafted: false,
-    log: ['You spawn in Vale. Harvest grain, then travel to Ridge for ore.'],
+    log: ['Spawn Vale. Leave 20 grain home. Fee 2 + carry ~28 grain → Ridge. Sell grain (1.05), buy ore (local sell 1.3), fee timber/ore, return, craft.'],
   };
 }
 
@@ -177,8 +177,19 @@ function arrive(state: GameState) {
 
 export function tick(state: GameState, dt: number) {
   tickEnergy(state, dt);
+  const wasTravelling = !!state.travel;
+  let travelLeft = 0;
+  if (state.travel) {
+    travelLeft = Math.max(0, state.travel.duration - state.travel.elapsed);
+  }
   tickTravel(state, dt);
-  tickIdle(state, dt);
+  // Idle only while in a region; if we arrived mid-tick, idle for remainder only
+  if (wasTravelling && !state.travel) {
+    const rem = Math.max(0, dt - travelLeft);
+    if (rem > 0) tickIdle(state, rem);
+  } else {
+    tickIdle(state, dt);
+  }
 }
 
 export function cargoTotal(cargo: Inventory): number {
@@ -279,7 +290,10 @@ export function buyFromNpc(state: GameState, good: Good, amount: number): boolea
   if (amount <= 0) return false;
   const price = npcSellPrice(state.region, good);
   const cost = price * amount;
-  if (state.coin < cost) return false;
+  if (state.coin + 1e-9 < cost) {
+    pushLog(state, `Need ${cost.toFixed(2)} coin to buy ${amount} ${good} (have ${state.coin.toFixed(2)}).`);
+    return false;
+  }
   const stash = state.stashes[state.region];
   state.coin -= cost;
   stash[good] += amount;
