@@ -11,12 +11,25 @@ npm install
 npm run dev
 ```
 
-Open the URL Vite prints (usually `http://localhost:5173`).
+Open the URL Vite prints. With the default Vite `base` that is `http://localhost:5173/games/trade/`.
 
 ```bash
-npm run build    # tsc + vite → dist/
-npm run preview  # serve dist/ locally
+npm run build          # tsc + vite → dist/  (base /games/trade/)
+npm run build:pages    # same, base /regional-trade/ for GitHub Pages
+npm run preview        # serve dist/ locally
+npm run check          # honesty: Workbench needs travel; idle off in transit
 ```
+
+### Vite base (dual deploy)
+
+Asset URLs are prefixed by Vite `base` so they do not 404 on a subdirectory.
+
+| Host | `VITE_BASE` | Play URL |
+|---|---|---|
+| pepelyankov.com (canonical) | `/games/trade/` (default) | https://pepelyankov.com/games/trade/ |
+| GitHub Pages | `/regional-trade/` | https://kr3t3n.github.io/regional-trade/ |
+
+Override either host with `VITE_BASE=/your/path/ npm run build`, or set `GITHUB_PAGES=1` to force `/regional-trade/`.
 
 Progress (stash per region, nodes, coin, energy, region, in-transit cargo, Workbench) is saved to **localStorage** (`regional-trade-v1`). There is a **Reset save** button. Offline catch-up is **off**: closing the tab does not grant idle, energy, or travel credit.
 
@@ -51,7 +64,7 @@ No server routes, no environment variables, no DNS changes required.
 2. Stock ~50 grain: **leave 20 at home** for the craft, pay fee **2 grain**, carry **~28 grain** (cargo cap 40).
 3. **Direct (intended):** destination **Ridge**, Depart (25s).  
    **Two-hop tutorial:** Vale → **Cross** (20s) → Ridge (20s). No extra buildings; Cross is only a waypoint.
-4. At Ridge, **sell** grain to NPC (foreign buy **1.05P**). **Buy ore** — ore is local to Ridge so NPC sell is **1.3P** (not Travian 1:1). 28 grain → 29.4 coin → 22 ore.
+4. At Ridge, open the **NPC market**. Change **Amount** — each row’s sell/buy **total** updates live (`amount × /ea`). Confirm **Sell** / **Buy** uses that same total (coin only; no barter). Sell grain (foreign buy **1.05P**). Buy ore — ore is local to Ridge so NPC sell is **1.3P** (not Travian 1:1). 28 grain → 29.4 coin → 22 ore.
 5. Keep 2 ore (or timber) for the return fee. Depart Vale with **20 ore** in cargo.
 6. In Vale, craft **Workbench** (20 grain left at home + 20 ore).
 
@@ -64,7 +77,8 @@ Honesty: cannot craft without leaving Vale (ore is foreign there); idle pauses i
 | `src/config.ts` | All V1 numbers (regions, harvest, energy, travel, NPC spreads, Workbench, save key) |
 | `src/game.ts` | State + tick + actions |
 | `src/persist.ts` | localStorage save/load/reset (no offline catch-up) |
-| `src/main.ts` | One-screen UI |
+| `src/main.ts` | One-screen UI (NPC totals = amount × unit, live) |
+| `vite.config.ts` | Dual `base`: `/games/trade/` or `/regional-trade/` |
 | `PLAN.md` | Later path to multiplayer + AI regional agents — not in this build |
 
 ## Out of v1

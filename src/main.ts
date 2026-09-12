@@ -24,6 +24,7 @@ import {
   TICK_HZ,
   npcBuyPrice,
   npcSellPrice,
+  npcTradeTotal,
   travelSeconds,
   type GameState,
   type Good,
@@ -248,22 +249,40 @@ function render() {
 
           <section class="panel npc">
             <h2>NPC market <span class="muted">${region.name}</span></h2>
-            <p class="hint">Not 1:1. Local buy 0.7P / sell 1.3P. Foreign buy 1.05P / sell 1.15P. P=1. Ridge ore sells at <strong>1.3</strong>.</p>
+            <p class="hint">Coin only — sell for coin, buy with coin. No barter. Spreads from config: local buy 0.7P / sell 1.3P, foreign buy 1.05P / sell 1.15P (P=1). Ridge ore sells at <strong>1.3</strong>.</p>
             <div class="trade-amt">
-              Amount
+              <label for="tradeAmt">Amount</label>
               <input type="number" id="tradeAmt" min="1" step="1" value="${tradeAmount}" />
+              <p class="trade-live-hint">Totals = amount × unit price, live before confirm.</p>
             </div>
             <table>
-              <thead><tr><th>Good</th><th>You sell</th><th>You buy</th><th></th></tr></thead>
+              <thead>
+                <tr>
+                  <th>Good</th>
+                  <th>You sell <span class="th-sub">NPC pays you</span></th>
+                  <th>You buy <span class="th-sub">you pay NPC</span></th>
+                  <th></th>
+                </tr>
+              </thead>
               <tbody>
                 ${GOODS.map((g) => {
                   const buyP = npcBuyPrice(region.id, g);
                   const sellP = npcSellPrice(region.id, g);
+                  const sellTotal = npcTradeTotal(buyP, tradeAmount);
+                  const buyTotal = npcTradeTotal(sellP, tradeAmount);
                   const tag = region.local.includes(g) ? 'local' : 'foreign';
                   return `<tr class="${tag}">
                     <td>${goodChip(g)}</td>
-                    <td>${buyP.toFixed(2)}</td>
-                    <td>${sellP.toFixed(2)}</td>
+                    <td class="price">
+                      <span class="unit">${buyP.toFixed(2)} <span class="per">/ea</span></span>
+                      <strong class="total" data-trade-total="sell" data-good="${g}" data-unit="${buyP}">${sellTotal.toFixed(2)}</strong>
+                      <span class="coin-lbl">coin</span>
+                    </td>
+                    <td class="price">
+                      <span class="unit">${sellP.toFixed(2)} <span class="per">/ea</span></span>
+                      <strong class="total" data-trade-total="buy" data-good="${g}" data-unit="${sellP}">${buyTotal.toFixed(2)}</strong>
+                      <span class="coin-lbl">coin</span>
+                    </td>
                     <td class="acts">
                       <button type="button" data-act="sell" data-good="${g}">Sell</button>
                       <button type="button" data-act="buy" data-good="${g}">Buy</button>
@@ -356,6 +375,7 @@ function render() {
     </div>
   `;
   dirty = false;
+  paintTradePanel();
 }
 
 function paintLive() {
@@ -419,6 +439,40 @@ function paintLive() {
   if (craftErrEl && !state.workbenchCrafted) {
     craftErrEl.textContent = craftErr ?? '';
   }
+  paintTradePanel();
+}
+
+function paintTradePanel() {
+  const region = state.region && !state.travel ? REGIONS[state.region] : null;
+  const stash = state.region && !state.travel ? state.stashes[state.region] : null;
+  app.querySelectorAll<HTMLElement>('[data-trade-total]').forEach((el) => {
+    const unit = Number(el.dataset.unit);
+    if (!Number.isFinite(unit)) return;
+    const total = npcTradeTotal(unit, tradeAmount);
+    el.textContent = total.toFixed(2);
+    const good = el.dataset.good as Good | undefined;
+    const side = el.dataset.tradeTotal;
+    const cell = el.closest('td');
+    if (!cell || !good || !stash) return;
+    if (side === 'sell') {
+      cell.classList.toggle('short', stash[good] + 1e-9 < tradeAmount);
+    } else if (side === 'buy') {
+      cell.classList.toggle('short', state.coin + 1e-9 < total);
+    }
+  });
+  app.querySelectorAll<HTMLButtonElement>('button[data-act="sell"]').forEach((btn) => {
+    const g = btn.dataset.good as Good;
+    btn.disabled = !stash || stash[g] + 1e-9 < tradeAmount;
+  });
+  app.querySelectorAll<HTMLButtonElement>('button[data-act="buy"]').forEach((btn) => {
+    const g = btn.dataset.good as Good;
+    if (!region) {
+      btn.disabled = true;
+      return;
+    }
+    const total = npcTradeTotal(npcSellPrice(region.id, g), tradeAmount);
+    btn.disabled = state.coin + 1e-9 < total;
+  });
 }
 
 function afterAction(full: boolean) {
@@ -498,6 +552,7 @@ app.addEventListener('input', () => {
   if (el) {
     el.textContent = `Cargo ${fmt(cargoTotalPick())} / ${TRAVEL.cargoCap}`;
   }
+  paintTradePanel();
 });
 
 window.addEventListener('beforeunload', persistNow);
