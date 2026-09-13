@@ -9,6 +9,7 @@ import {
   HARVEST,
   SAVE_KEY,
   OFFLINE_CATCHUP_SECONDS,
+  npcStockCap,
   type Good,
   type RegionId,
 } from './config';
@@ -16,8 +17,11 @@ import {
   createInitialState,
   emptyInv,
   cloneInv,
+  cloneNpcBooks,
+  fullNpcBooks,
   type GameState,
   type Inventory,
+  type NpcBooks,
   type TravelState,
 } from './game';
 import {
@@ -41,6 +45,7 @@ interface SaveV1 {
   workbenchCrafted: boolean;
   timberBraceCrafted?: boolean;
   cargoUpgrades?: number;
+  npcBooks?: NpcBooks;
   log: string[];
   tutorial?: TutorialState;
 }
@@ -90,6 +95,30 @@ function parseTravel(raw: unknown): TravelState | null | undefined {
   };
 }
 
+function parseNpcBooks(raw: unknown): NpcBooks | null {
+  if (raw === undefined) return fullNpcBooks();
+  if (!raw || typeof raw !== 'object') return null;
+  const rec = raw as Record<string, unknown>;
+  const books = fullNpcBooks();
+  for (const id of REGION_IDS) {
+    const part = rec[id];
+    if (!part || typeof part !== 'object') return null;
+    const goods = part as Record<string, unknown>;
+    for (const g of GOODS) {
+      const side = goods[g];
+      if (!side || typeof side !== 'object') return null;
+      const pair = side as Record<string, unknown>;
+      if (!finiteNonNeg(pair.buy) || !finiteNonNeg(pair.sell)) return null;
+      const cap = npcStockCap(id, g);
+      books[id][g] = {
+        buy: Math.min(cap, pair.buy),
+        sell: Math.min(cap, pair.sell),
+      };
+    }
+  }
+  return books;
+}
+
 function parseNodes(raw: unknown): GameState['nodes'] | null {
   if (!raw || typeof raw !== 'object') return null;
   const rec = raw as Record<string, unknown>;
@@ -133,6 +162,7 @@ export function saveGame(state: GameState): void {
     workbenchCrafted: state.workbenchCrafted,
     timberBraceCrafted: state.timberBraceCrafted,
     cargoUpgrades: state.cargoUpgrades,
+    npcBooks: cloneNpcBooks(state.npcBooks),
     log: state.log.slice(0, 8),
     tutorial: { ...state.tutorial },
   };
@@ -217,11 +247,22 @@ export function loadGame(): GameState | null {
       }
     }
     const cargoUpgrades = data.cargoUpgrades ?? 0;
+    const npcBooks = parseNpcBooks(data.npcBooks);
+    if (!npcBooks) return null;
+
+    const booksMoved = REGION_IDS.some((id) =>
+      GOODS.some((g) => {
+        const cap = npcStockCap(id, g);
+        const book = npcBooks[id][g];
+        return book.buy + 0.05 < cap || book.sell + 0.05 < cap;
+      })
+    );
 
     const hasProgress =
       data.workbenchCrafted ||
       timberBraceCrafted ||
       cargoUpgrades > 0 ||
+      booksMoved ||
       !!travel ||
       data.coin > 0 ||
       energy < HARVEST.energyCap ||
@@ -249,6 +290,7 @@ export function loadGame(): GameState | null {
       workbenchCrafted: data.workbenchCrafted,
       timberBraceCrafted,
       cargoUpgrades,
+      npcBooks,
       log: log.length ? log : fresh.log,
       tutorial,
     };

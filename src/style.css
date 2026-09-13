@@ -515,6 +515,20 @@ tr.local td:first-child {
   font-weight: 600;
 }
 
+.stock-line {
+  display: block;
+  margin-top: 0.12rem;
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--muted);
+  line-height: 1.25;
+}
+
+.stock-line.empty,
+tr.book-empty .stock-line {
+  color: var(--short);
+}
+
 .acts {
   white-space: nowrap;
 }

@@ -12,6 +12,7 @@ import {
   CARGO_UPGRADE,
   cargoUpgradeCoinCost,
   cargoUpgradeGoodCost,
+  NPC_STOCK,
   TICK_HZ,
   SAVE_KEY,
   OFFLINE_CATCHUP_SECONDS,
@@ -22,11 +23,22 @@ import {
   travelSeconds,
   npcBuyPrice,
   npcSellPrice,
+  npcQuotedBuyPrice,
+  npcQuotedSellPrice,
+  npcStockCap,
   npcTradeTotal,
 } from './config';
 import { T0_LOG, createTutorialState, type TutorialState } from './tutorial';
 
 export type Inventory = Record<Good, number>;
+
+/** Per-good NPC book: buy = they take from you; sell = shelf you can buy. */
+export interface NpcBookSide {
+  buy: number;
+  sell: number;
+}
+
+export type NpcBooks = Record<RegionId, Record<Good, NpcBookSide>>;
 
 export interface TravelState {
   from: RegionId;
@@ -55,6 +67,8 @@ export interface GameState {
   timberBraceCrafted: boolean;
   /** Paid cargo tiers (#6). Stacks on base + brace. */
   cargoUpgrades: number;
+  /** Per-region NPC books. Restock even while you travel. */
+  npcBooks: NpcBooks;
   log: string[];
   tutorial: TutorialState;
 }
@@ -65,6 +79,30 @@ export function emptyInv(): Inventory {
 
 export function cloneInv(inv: Inventory): Inventory {
   return { ...inv };
+}
+
+export function fullNpcBooks(): NpcBooks {
+  const books = {} as NpcBooks;
+  for (const id of REGION_IDS) {
+    books[id] = {} as Record<Good, NpcBookSide>;
+    for (const g of GOODS) {
+      const cap = npcStockCap(id, g);
+      books[id][g] = { buy: cap, sell: cap };
+    }
+  }
+  return books;
+}
+
+export function cloneNpcBooks(books: NpcBooks): NpcBooks {
+  const next = {} as NpcBooks;
+  for (const id of REGION_IDS) {
+    next[id] = {} as Record<Good, NpcBookSide>;
+    for (const g of GOODS) {
+      const side = books[id][g];
+      next[id][g] = { buy: side.buy, sell: side.sell };
+    }
+  }
+  return next;
 }
 
 function sumInv(inv: Inventory): number {
@@ -93,6 +131,7 @@ export function createInitialState(): GameState {
     workbenchCrafted: false,
     timberBraceCrafted: false,
     cargoUpgrades: 0,
+    npcBooks: fullNpcBooks(),
     log: [T0_LOG],
     tutorial: createTutorialState(),
   };
@@ -251,8 +290,22 @@ function arrive(state: GameState) {
   else pushLog(state, 'Cross. Waypoint.');
 }
 
+export function tickNpcStock(state: GameState, dt: number) {
+  if (dt <= 0) return;
+  for (const id of REGION_IDS) {
+    for (const g of GOODS) {
+      const cap = npcStockCap(id, g);
+      const rate = cap / NPC_STOCK.restockSeconds;
+      const book = state.npcBooks[id][g];
+      book.buy = Math.min(cap, book.buy + rate * dt);
+      book.sell = Math.min(cap, book.sell + rate * dt);
+    }
+  }
+}
+
 export function tick(state: GameState, dt: number) {
   tickEnergy(state, dt);
+  tickNpcStock(state, dt);
   const wasTravelling = !!state.travel;
   let travelLeft = 0;
   if (state.travel) {
@@ -348,25 +401,63 @@ export function cancelTravel(state: GameState): boolean {
   return true;
 }
 
-/** Sell to NPC (NPC buys from you) */
+export function npcBookFill(remaining: number, cap: number): number {
+  if (cap <= 0) return 0;
+  return Math.max(0, Math.min(1, remaining / cap));
+}
+
+export function quotedBuyPrice(state: GameState, regionId: RegionId, good: Good): number {
+  const cap = npcStockCap(regionId, good);
+  const fill = npcBookFill(state.npcBooks[regionId][good].buy, cap);
+  return npcQuotedBuyPrice(regionId, good, fill);
+}
+
+export function quotedSellPrice(state: GameState, regionId: RegionId, good: Good): number {
+  const cap = npcStockCap(regionId, good);
+  const fill = npcBookFill(state.npcBooks[regionId][good].sell, cap);
+  return npcQuotedSellPrice(regionId, good, fill);
+}
+
+/** Sell to NPC (NPC buys from you). Volume comes off their buy side. */
 export function sellToNpc(state: GameState, good: Good, amount: number): boolean {
   if (!state.region || state.travel) return false;
   if (amount <= 0) return false;
   const stash = state.stashes[state.region];
   if (stash[good] < amount) return false;
-  const price = npcBuyPrice(state.region, good);
+  const book = state.npcBooks[state.region][good];
+  if (book.buy + 1e-9 < amount) {
+    pushLog(
+      state,
+      book.buy <= 1e-9
+        ? 'They will not take more. Restock is slow.'
+        : `Book takes ${Math.floor(book.buy)} ${good}.`
+    );
+    return false;
+  }
+  const price = quotedBuyPrice(state, state.region, good);
   const credit = npcTradeTotal(price, amount);
   stash[good] -= amount;
+  book.buy -= amount;
   state.coin += credit;
   pushLog(state, `Sold ${amount} ${good}.`);
   return true;
 }
 
-/** Buy from NPC (NPC sells to you) */
+/** Buy from NPC (NPC sells to you). Volume comes off their shelf. */
 export function buyFromNpc(state: GameState, good: Good, amount: number): boolean {
   if (!state.region || state.travel) return false;
   if (amount <= 0) return false;
-  const price = npcSellPrice(state.region, good);
+  const book = state.npcBooks[state.region][good];
+  if (book.sell + 1e-9 < amount) {
+    pushLog(
+      state,
+      book.sell <= 1e-9
+        ? 'Shelf empty. Restock is slow.'
+        : `Shelf holds ${Math.floor(book.sell)} ${good}.`
+    );
+    return false;
+  }
+  const price = quotedSellPrice(state, state.region, good);
   const cost = npcTradeTotal(price, amount);
   if (state.coin + 1e-9 < cost) {
     pushLog(state, `Need ${cost.toFixed(2)} coin to buy ${amount} ${good} (have ${state.coin.toFixed(2)}).`);
@@ -375,6 +466,7 @@ export function buyFromNpc(state: GameState, good: Good, amount: number): boolea
   const stash = state.stashes[state.region];
   state.coin -= cost;
   stash[good] += amount;
+  book.sell -= amount;
   pushLog(state, `Bought ${amount} ${good}.`);
   return true;
 }
@@ -473,11 +565,15 @@ export {
   cargoUpgradeGoodCost,
   recipeNeeds,
   recipeLabel,
+  NPC_STOCK,
   TICK_HZ,
   SAVE_KEY,
   OFFLINE_CATCHUP_SECONDS,
   npcBuyPrice,
   npcSellPrice,
+  npcQuotedBuyPrice,
+  npcQuotedSellPrice,
+  npcStockCap,
   npcTradeTotal,
   travelSeconds,
 };

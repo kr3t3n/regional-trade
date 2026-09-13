@@ -149,7 +149,7 @@ Constraints that keep AI from killing the loop [I]:
 Staging [I]:
 
 - **v1 (now):** static NPC bid/ask per region (already specified).
-- **v1.5:** those NPC quotes drift with recent volume (inventory that depletes / restocks slowly). Still one player.
+- **v1.5:** those NPC quotes drift with recent volume (inventory that depletes / restocks slowly). Still one player. Book depth and restock live in `src/config.ts` (`NPC_STOCK`).
 - **v2:** several named AI merchants visible in a town, same physics, so the book moves while you travel. Still one human.
 - **v3:** real multi. AI stay as the dry-book floor. Humans do not replace them on day one.
 

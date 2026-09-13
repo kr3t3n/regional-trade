@@ -3,6 +3,7 @@ import {
   HARVEST,
   HELP_KEY,
   NPC,
+  NPC_STOCK,
   TRAVEL,
   WORKBENCH_COST,
   WORKBENCH_UNLOCK_CARGO,
@@ -62,7 +63,7 @@ export function helperMarkup(): string {
         </div>
         <div>
           <dt>NPC spreads</dt>
-          <dd>Coin only; amount × unit. Local buy ${NPC.localBuyMult}P / sell ${NPC.localSellMult}P. Foreign buy ${NPC.foreignBuyMult}P / sell ${NPC.foreignSellMult}P. Ridge ore 1.3. No 1:1. No global board.</dd>
+          <dd>Coin only; amount × unit. Local buy ${NPC.localBuyMult}P / sell ${NPC.localSellMult}P. Foreign buy ${NPC.foreignBuyMult}P / sell ${NPC.foreignSellMult}P. Ridge ore 1.3. One haul empties a book (timber ${NPC_STOCK.timberMax}; others ${NPC_STOCK.generalMax}). Restock ${NPC_STOCK.restockSeconds}s — slower than Vale↔Ridge. Thin quotes widen inside that spread; empty waits. No 1:1. No global board.</dd>
         </div>
         <div>
           <dt>Coin</dt>

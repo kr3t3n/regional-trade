@@ -31,7 +31,7 @@ Asset URLs are prefixed by Vite `base` so they do not 404 on a subdirectory.
 
 Override either host with `VITE_BASE=/your/path/ npm run build`, or set `GITHUB_PAGES=1` to force `/regional-trade/`.
 
-Progress (stash per region, nodes, coin, energy, region, in-transit cargo, Workbench, Timber brace, cargo upgrades) is saved to **localStorage** (`regional-trade-v1`). There is a **Reset save** button. Offline catch-up is **off**: closing the tab does not grant idle, energy, or travel credit.
+Progress (stash per region, nodes, coin, energy, region, in-transit cargo, Workbench, Timber brace, cargo upgrades, NPC book stock) is saved to **localStorage** (`regional-trade-v1`). There is a **Reset save** button. Offline catch-up is **off**: closing the tab does not grant idle, energy, travel, or restock credit.
 
 **Help** is toggleable Field notes (concepts, not the first-trip walk). First visit stays closed and stores `regional-trade-helper=off`; it never auto-reopens after that. Reset save does not clear that preference.
 
@@ -68,10 +68,10 @@ No server routes, no environment variables, no DNS changes required.
 2. Stock ~50 grain: **leave 20 at home** for the craft, pay fee **2 grain**, carry **~28 grain** (cargo cap 40).
 3. **Direct (intended):** destination **Ridge**, Depart (25s).  
    **Two-hop tutorial:** Vale → **Cross** (20s) → Ridge (20s). No extra buildings; Cross is only a waypoint.
-4. At Ridge, open the **NPC market**. Change **Amount** — each row’s sell/buy **total** updates live (`amount × /ea`). Confirm **Sell** / **Buy** uses that same total (coin only; no barter). Sell grain (foreign buy **1.05P**). Buy ore — ore is local to Ridge so NPC sell is **1.3P** (not Travian 1:1). 28 grain → 29.4 coin → 22 ore.
+4. At Ridge, open the **NPC market**. Each row shows remaining stock (`on the shelf` / `takes`). Change **Amount** — each row’s sell/buy **total** updates live (`amount × /ea`). Confirm **Sell** / **Buy** uses that same total (coin only; no barter). Sell grain (foreign buy **1.05P** while the book is full). Buy ore — ore is local to Ridge so NPC sell is **1.3P** (not Travian 1:1). 28 grain → 29.4 coin → 22 ore. A heavy fill empties that side; quotes may drift inside the local 0.7/1.3 and foreign 1.05/1.15 envelope. Empty books block (or sit at the wide end) — they do not go 1:1. Restock is **40s** to a full book, slower than Vale↔Ridge (**25s**), so waiting one road does not refill a haul.
 5. Keep 2 ore (or timber) for the return fee. Depart Vale with **20 ore** in cargo.
 6. In Vale, craft **Workbench** (20 grain left at home + 20 ore). The complete screen says the bench stands and the next board wants timber — foreign in Vale. Cargo cap stays **40**.
-7. Haul **20 timber** home (Ridge harvest or buy abroad). Leave **15 grain** in the Vale stash. Craft **Timber brace**. That spend cannot finish from Vale harvest. Cargo cap becomes **45**.
+7. Haul **20 timber** home (Ridge harvest or buy abroad). Ridge/Cross timber shelves hold **20** — one brace buy empties the book. Leave **15 grain** in the Vale stash. Craft **Timber brace**. That spend cannot finish from Vale harvest. Cargo cap becomes **45**. Another timber buy means wait for restock or change town/plan.
 8. **Cargo upgrades** (Travel panel): current cap, next +5 cost (coin + a local good here), Buy. Paid tiers stack on the current cap — brace then paid → 50, or paid then brace → 50. Travel still wants fee + packing.
 
 Honesty: cannot craft Workbench without leaving Vale (ore is foreign there); cannot craft Timber brace without timber (also foreign in Vale); idle pauses in transit; arrival tick does not grant a full idle slice; NPC spreads stay in `src/config.ts`.
@@ -80,7 +80,7 @@ Honesty: cannot craft Workbench without leaving Vale (ore is foreign there); can
 
 | Path | Role |
 |---|---|
-| `src/config.ts` | All V1 numbers (regions, harvest, energy, travel, NPC spreads, Workbench, Timber brace, cargo upgrades, save key) |
+| `src/config.ts` | All V1 numbers (regions, harvest, energy, travel, NPC spreads, book depth / restock, Workbench, Timber brace, cargo upgrades, save key) |
 | `src/game.ts` | State + tick + actions |
 | `src/persist.ts` | localStorage save/load/reset (no offline catch-up) |
 | `src/main.ts` | One-screen UI (NPC totals = amount × unit, live) |
