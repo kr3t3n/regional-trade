@@ -79,6 +79,15 @@ export const WORKBENCH_COST: Partial<Record<Good, number>> = {
 };
 
 /**
+ * Timber brace — second craft gate. Timber is Vale-foreign, so the
+ * stash spend cannot finish from Vale harvest alone (haul or buy abroad).
+ */
+export const TIMBER_BRACE_COST: Partial<Record<Good, number>> = {
+  grain: 15,
+  timber: 20,
+};
+
+/**
  * NPC market — hidden fair P = 1 coin for all goods in v1.
  * Spread 30% around P.
  * Local: NPC buys at 0.7P, sells at 1.3P
@@ -102,12 +111,22 @@ export const SAVE_KEY = 'regional-trade-v1';
 export const HELP_KEY = 'regional-trade-helper';
 
 /**
- * Promised after Workbench — copy only until #7 ships the real unlock.
- * Does not change TRAVEL.cargoCap (still 40). Next recipe must spend a
- * Vale-foreign good so the second trip stays honest.
+ * Second recipe after Workbench. Must stay Vale-foreign so the brace
+ * trip stays honest. Cargo +5 applies only after Timber brace crafts.
+ * TRAVEL.cargoCap stays the base 40 — not a #6 paid upgrade UI.
  */
 export const NEXT_RECIPE_NEEDS: Good = 'timber';
 export const WORKBENCH_UNLOCK_CARGO = 5;
+
+export function recipeNeeds(cost: Partial<Record<Good, number>>): [Good, number][] {
+  return (Object.entries(cost) as [Good, number][]).filter(([, n]) => n > 0);
+}
+
+export function recipeLabel(cost: Partial<Record<Good, number>>): string {
+  return recipeNeeds(cost)
+    .map(([g, n]) => `${n} ${g}`)
+    .join(' + ');
+}
 
 /**
  * Offline catch-up seconds. 0 = off (notebook: none in v1, or cap 5 min).

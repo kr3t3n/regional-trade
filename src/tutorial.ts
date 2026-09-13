@@ -64,7 +64,7 @@ export const TUTORIAL_STEPS: Record<
   },
   8: {
     kicker: 'Complete',
-    html: 'Built. Next board still wants timber (foreign here) — another trip later. Field notes stay under Help.',
+    html: 'Built. Next: timber brace — still a foreign spend here. Another trip later. Field notes stay under Help.',
     target: 'craft',
   },
 };

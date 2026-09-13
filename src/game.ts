@@ -6,11 +6,14 @@ import {
   HARVEST,
   TRAVEL,
   WORKBENCH_COST,
+  TIMBER_BRACE_COST,
   NEXT_RECIPE_NEEDS,
   WORKBENCH_UNLOCK_CARGO,
   TICK_HZ,
   SAVE_KEY,
   OFFLINE_CATCHUP_SECONDS,
+  recipeNeeds,
+  recipeLabel,
   type Good,
   type RegionId,
   travelSeconds,
@@ -46,6 +49,7 @@ export interface GameState {
   nodes: Record<RegionId, Partial<Record<Good, number>>>;
   travel: TravelState | null;
   workbenchCrafted: boolean;
+  timberBraceCrafted: boolean;
   log: string[];
   tutorial: TutorialState;
 }
@@ -82,9 +86,15 @@ export function createInitialState(): GameState {
     nodes,
     travel: null,
     workbenchCrafted: false,
+    timberBraceCrafted: false,
     log: [T0_LOG],
     tutorial: createTutorialState(),
   };
+}
+
+/** Live cargo cap. Base 40 until Timber brace; then +5. Not a #6 paid upgrade. */
+export function cargoCap(state: Pick<GameState, 'timberBraceCrafted'>): number {
+  return TRAVEL.cargoCap + (state.timberBraceCrafted ? WORKBENCH_UNLOCK_CARGO : 0);
 }
 
 function pushLog(state: GameState, msg: string) {
@@ -231,7 +241,8 @@ export function canDepart(state: GameState, opts: DepartOptions): string | null 
     if (stash[g] + 1e-9 < need[g]) return `Need ${need[g].toFixed(0)} ${g} (incl. fee).`;
   }
   const total = sumInv(opts.cargo);
-  if (total > TRAVEL.cargoCap) return `Cargo over cap (${TRAVEL.cargoCap}).`;
+  const cap = cargoCap(state);
+  if (total > cap) return `Cargo over cap (${cap}).`;
   if (total < 0) return 'Invalid cargo.';
   return null;
 }
@@ -318,14 +329,25 @@ export function buyFromNpc(state: GameState, good: Good, amount: number): boolea
  * Honesty: cannot craft without travelling (ore not harvestable in Vale).
  * Goods must be in the SAME region's stash (you craft where you stand).
  */
-export function canCraftWorkbench(state: GameState): string | null {
-  if (state.workbenchCrafted) return 'Already crafted.';
+function missingRecipe(state: GameState, cost: Partial<Record<Good, number>>): string | null {
   if (!state.region || state.travel) return 'Must be in a region.';
   const stash = state.stashes[state.region];
-  for (const [g, need] of Object.entries(WORKBENCH_COST) as [Good, number][]) {
+  for (const [g, need] of recipeNeeds(cost)) {
     if (stash[g] < need) return `Need ${need} ${g} here (have ${stash[g].toFixed(1)}).`;
   }
   return null;
+}
+
+function spendRecipe(state: GameState, cost: Partial<Record<Good, number>>) {
+  const stash = currentStash(state)!;
+  for (const [g, need] of recipeNeeds(cost)) {
+    stash[g] -= need;
+  }
+}
+
+export function canCraftWorkbench(state: GameState): string | null {
+  if (state.workbenchCrafted) return 'Already crafted.';
+  return missingRecipe(state, WORKBENCH_COST);
 }
 
 export function craftWorkbench(state: GameState): boolean {
@@ -334,13 +356,50 @@ export function craftWorkbench(state: GameState): boolean {
     pushLog(state, err);
     return false;
   }
-  const stash = currentStash(state)!;
-  for (const [g, need] of Object.entries(WORKBENCH_COST) as [Good, number][]) {
-    stash[g] -= need;
-  }
+  spendRecipe(state, WORKBENCH_COST);
   state.workbenchCrafted = true;
   pushLog(state, `Workbench stands in ${REGIONS[state.region!].name}.`);
   return true;
+}
+
+/**
+ * Craft Timber brace: timber (Vale-foreign) + a Vale-local good in this stash.
+ * Honesty: cannot finish from Vale harvest alone.
+ */
+export function canCraftTimberBrace(state: GameState): string | null {
+  if (!state.workbenchCrafted) return 'Craft the Workbench first.';
+  if (state.timberBraceCrafted) return 'Already crafted.';
+  return missingRecipe(state, TIMBER_BRACE_COST);
+}
+
+export function craftTimberBrace(state: GameState): boolean {
+  const err = canCraftTimberBrace(state);
+  if (err) {
+    pushLog(state, err);
+    return false;
+  }
+  spendRecipe(state, TIMBER_BRACE_COST);
+  state.timberBraceCrafted = true;
+  pushLog(state, `Timber brace set in ${REGIONS[state.region!].name}.`);
+  return true;
+}
+
+export function canCraftCurrent(state: GameState): string | null {
+  if (!state.workbenchCrafted) return canCraftWorkbench(state);
+  if (!state.timberBraceCrafted) return canCraftTimberBrace(state);
+  return 'Already crafted.';
+}
+
+export function craftCurrent(state: GameState): boolean {
+  if (!state.workbenchCrafted) return craftWorkbench(state);
+  if (!state.timberBraceCrafted) return craftTimberBrace(state);
+  return false;
+}
+
+export function currentRecipeCost(state: GameState): Partial<Record<Good, number>> | null {
+  if (!state.workbenchCrafted) return WORKBENCH_COST;
+  if (!state.timberBraceCrafted) return TIMBER_BRACE_COST;
+  return null;
 }
 
 export {
@@ -351,8 +410,11 @@ export {
   HARVEST,
   TRAVEL,
   WORKBENCH_COST,
+  TIMBER_BRACE_COST,
   NEXT_RECIPE_NEEDS,
   WORKBENCH_UNLOCK_CARGO,
+  recipeNeeds,
+  recipeLabel,
   TICK_HZ,
   SAVE_KEY,
   OFFLINE_CATCHUP_SECONDS,

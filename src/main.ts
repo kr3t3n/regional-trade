@@ -9,8 +9,10 @@ import {
   cancelTravel,
   sellToNpc,
   buyFromNpc,
-  craftWorkbench,
-  canCraftWorkbench,
+  craftCurrent,
+  canCraftCurrent,
+  currentRecipeCost,
+  cargoCap,
   upgradeNode,
   nodeUpgradeCost,
   nodeLevel,
@@ -21,8 +23,9 @@ import {
   HARVEST,
   TRAVEL,
   WORKBENCH_COST,
-  NEXT_RECIPE_NEEDS,
-  WORKBENCH_UNLOCK_CARGO,
+  TIMBER_BRACE_COST,
+  recipeNeeds,
+  recipeLabel,
   TICK_HZ,
   npcBuyPrice,
   npcSellPrice,
@@ -44,6 +47,7 @@ import {
   startTutorial,
   syncTutorial,
 } from './tutorial';
+import { MISSION } from './mission';
 
 let state: GameState = loadGame() ?? createInitialState();
 const cargoPick: Inventory = { grain: 0, ore: 0, timber: 0, fibre: 0 };
@@ -101,7 +105,10 @@ function cargoHint(): string {
     return ' · Two-hop: after Cross, depart Ridge for the ore market (local sell 1.3P).';
   }
   if (destPick === 'ridge' && state.region === 'vale' && !state.workbenchCrafted) {
-    return ' · Leave 20 grain in Vale for the craft.';
+    return ` · Leave ${WORKBENCH_COST.grain} grain in Vale for the craft.`;
+  }
+  if (destPick === 'ridge' && state.region === 'vale' && !state.timberBraceCrafted) {
+    return ` · Leave ${TIMBER_BRACE_COST.grain} grain in Vale for the brace.`;
   }
   return '';
 }
@@ -109,7 +116,7 @@ function cargoHint(): string {
 function writeCargoTotal() {
   const el = document.getElementById('ui-cargo-total');
   if (el) {
-    el.textContent = `Cargo ${fmt(cargoTotalPick())} / ${TRAVEL.cargoCap}${cargoHint()}`;
+    el.textContent = `Cargo ${fmt(cargoTotalPick())} / ${cargoCap(state)}${cargoHint()}`;
   }
 }
 
@@ -118,7 +125,7 @@ function packMax(good: Good) {
   const stash = state.stashes[state.region];
   const reserved = good === feeGood ? TRAVEL.feeAmount : 0;
   const others = GOODS.reduce((s, g) => s + (g === good ? 0 : cargoPick[g]), 0);
-  const room = Math.max(0, TRAVEL.cargoCap - others);
+  const room = Math.max(0, cargoCap(state) - others);
   const have = Math.max(0, stash[good] - reserved);
   cargoPick[good] = Math.floor(Math.min(room, have));
 }
@@ -130,25 +137,71 @@ function elsewhere(good: Good): string {
   return bits.length ? bits.join(', ') : '';
 }
 
-function completeCopy(): string {
-  return `Unlocks the next recipe board and cargo +${WORKBENCH_UNLOCK_CARGO} or local craft speed (until the real unlock ships). Next recipe still spends ${GOOD_LABEL[NEXT_RECIPE_NEEDS]} — foreign in Vale, so another trip.`;
+function recipeChips(cost: Partial<Record<Good, number>>): string {
+  const here = state.region ? state.stashes[state.region] : null;
+  return recipeNeeds(cost)
+    .map(([g, need]) => {
+      const have = here ? here[g] : 0;
+      const ok = have + 1e-9 >= need;
+      const other = elsewhere(g);
+      return `<span class="need ${ok ? 'ok' : ''}" data-goal="${g}">${goodIcon(g)} <span data-goal-have="${g}">${fmt(have)}</span>/${need}${
+        !ok && other ? ` <em data-goal-else="${g}">(${other})</em>` : `<em data-goal-else="${g}" hidden></em>`
+      }</span>`;
+    })
+    .join('');
 }
 
 function goalBlock(): string {
-  if (state.workbenchCrafted) {
-    return `<div class="win complete-chip"><span class="lbl">Workbench</span><strong>Built</strong><span class="muted">Next board still wants ${GOOD_LABEL[NEXT_RECIPE_NEEDS].toLowerCase()}</span></div>`;
-  }
-  const here = state.region ? state.stashes[state.region] : null;
-  const parts = (Object.entries(WORKBENCH_COST) as [Good, number][]).map(([g, need]) => {
-    const have = here ? here[g] : 0;
-    const ok = have + 1e-9 >= need;
-    const other = elsewhere(g);
-    return `<span class="need ${ok ? 'ok' : ''}" data-goal="${g}">${goodIcon(g)} <span data-goal-have="${g}">${fmt(have)}</span>/${need}${
-      !ok && other ? ` <em data-goal-else="${g}">(${other})</em>` : `<em data-goal-else="${g}" hidden></em>`
-    }</span>`;
-  });
   const mark = coachTarget(state);
-  return `<div class="goal${mark === 'goal' ? ' coach-target' : ''}"><span class="lbl">Workbench</span> ${parts.join('')}</div>`;
+  if (state.timberBraceCrafted) {
+    return `<div class="win complete-chip"><span class="lbl">${MISSION.timberBrace.label}</span><strong>Set</strong><span class="muted">${MISSION.timberBrace.completeChip}</span></div>`;
+  }
+  if (state.workbenchCrafted) {
+    return `<div class="goal${mark === 'goal' ? ' coach-target' : ''}"><span class="lbl">${MISSION.timberBrace.label}</span> ${recipeChips(TIMBER_BRACE_COST)}<span class="muted goal-why">${MISSION.timberBrace.why}</span></div>`;
+  }
+  return `<div class="goal${mark === 'goal' ? ' coach-target' : ''}"><span class="lbl">${MISSION.workbench.label}</span> ${recipeChips(WORKBENCH_COST)}<span class="muted goal-why">${MISSION.workbench.why}</span></div>`;
+}
+
+function craftPanel(): string {
+  const mark = coachTarget(state);
+  const craftErr = canCraftCurrent(state);
+  if (state.timberBraceCrafted) {
+    return `
+          <section class="panel craft${mark === 'craft' ? ' coach-target' : ''}">
+            <h2>${panelMark('craft')} Craft</h2>
+            <div class="complete" id="ui-complete">
+              <p class="complete-kicker">Second gate</p>
+              <h3>${MISSION.timberBrace.completeTitle}</h3>
+              <p>${MISSION.timberBrace.completeBody}</p>
+            </div>
+          </section>`;
+  }
+  if (state.workbenchCrafted) {
+    return `
+          <section class="panel craft${mark === 'craft' ? ' coach-target' : ''}">
+            <h2>${panelMark('craft')} Craft</h2>
+            <div class="complete" id="ui-complete">
+              <p class="complete-kicker">First gate</p>
+              <h3>${MISSION.workbench.completeTitle}</h3>
+              <p>${MISSION.workbench.completeBody}</p>
+              <p class="muted">${MISSION.workbench.completeChip}</p>
+            </div>
+            <p class="hint">Timber is not local in Vale. Haul it home, then craft here.</p>
+            <button type="button" data-act="craft" ${craftErr ? 'disabled' : ''}>
+              Craft ${MISSION.timberBrace.label} (${recipeLabel(TIMBER_BRACE_COST)})
+            </button>
+            <p class="hint" id="ui-craft-err">${craftErr ?? ''}</p>
+          </section>`;
+  }
+  return `
+          <section class="panel craft${mark === 'craft' ? ' coach-target' : ''}">
+            <h2>${panelMark('craft')} Craft</h2>
+            <p class="hint">Ore is not local in Vale. Finish a Ridge trip (or Cross→Ridge), then craft here.</p>
+            <button type="button" data-act="craft" ${craftErr ? 'disabled' : ''}>
+              Craft ${MISSION.workbench.label} (${recipeLabel(WORKBENCH_COST)})
+            </button>
+            <p class="hint" id="ui-craft-err">${craftErr ?? ''}</p>
+          </section>`;
 }
 
 function regionRail(): string {
@@ -199,7 +252,6 @@ function render() {
     destPick = REGION_IDS.find((id) => id !== region.id) ?? 'ridge';
   }
 
-  const craftErr = canCraftWorkbench(state);
   const destinations = REGION_IDS.filter((id) => id !== state.region);
   const destSecs = region ? travelSeconds(region.id, destPick) : 0;
   const energyPct = Math.min(100, (state.energy / HARVEST.energyCap) * 100);
@@ -263,7 +315,7 @@ function render() {
           <h2>${panelMark('travel')} Travel</h2>
           <p class="paused">Idle waits at home</p>
           <p>On the road: no harvest. Cargo rides with you.</p>
-          <p class="cargo-line">Cargo ${fmt(GOODS.reduce((s, g) => s + state.travel!.cargo[g], 0))} / ${TRAVEL.cargoCap}
+          <p class="cargo-line">Cargo ${fmt(GOODS.reduce((s, g) => s + state.travel!.cargo[g], 0))} / ${cargoCap(state)}
             ${GOODS.filter((g) => state.travel!.cargo[g] > 0)
               .map((g) => `${goodChip(g)} ${fmt(state.travel!.cargo[g])}`)
               .join(' ')}
@@ -394,25 +446,10 @@ function render() {
               </label>
               <button type="button" data-act="depart">Depart (${destSecs}s)</button>
             </div>
-            <p class="meta" id="ui-cargo-total">Cargo ${fmt(cargoTotalPick())} / ${TRAVEL.cargoCap}${cargoHint()}</p>
+            <p class="meta" id="ui-cargo-total">Cargo ${fmt(cargoTotalPick())} / ${cargoCap(state)}${cargoHint()}</p>
           </section>
 
-          <section class="panel craft${mark === 'craft' ? ' coach-target' : ''}">
-            <h2>${panelMark('craft')} Craft</h2>
-            ${
-              state.workbenchCrafted
-                ? `<div class="complete" id="ui-complete">
-                    <p class="complete-kicker">First gate</p>
-                    <h3>Workbench built</h3>
-                    <p>${completeCopy()}</p>
-                  </div>`
-                : `<p class="hint">Ore is not local in Vale. Finish a Ridge trip (or Cross→Ridge), then craft here.</p>
-            <button type="button" data-act="craft" ${craftErr ? 'disabled' : ''}>
-              Craft Workbench (20 grain + 20 ore)
-            </button>
-            <p class="hint" id="ui-craft-err">${craftErr ?? ''}</p>`
-            }
-          </section>
+          ${craftPanel()}
         `
             : `
           <section class="panel harvest muted-panel">
@@ -476,29 +513,32 @@ function paintLive() {
   });
 
   const here = state.region && !state.travel ? state.stashes[state.region] : null;
-  for (const [g, need] of Object.entries(WORKBENCH_COST) as [Good, number][]) {
-    const have = here ? here[g] : 0;
-    const haveEl = document.querySelector(`[data-goal-have="${g}"]`);
-    if (haveEl) haveEl.textContent = fmt(have);
-    const needEl = document.querySelector(`[data-goal="${g}"]`);
-    if (needEl) needEl.classList.toggle('ok', have + 1e-9 >= need);
-    const elseEl = document.querySelector<HTMLElement>(`[data-goal-else="${g}"]`);
-    if (elseEl) {
-      const other = elsewhere(g);
-      if (other && have + 1e-9 < need) {
-        elseEl.hidden = false;
-        elseEl.textContent = `(${other})`;
-      } else {
-        elseEl.hidden = true;
-        elseEl.textContent = '';
+  const liveCost = currentRecipeCost(state);
+  if (liveCost) {
+    for (const [g, need] of recipeNeeds(liveCost)) {
+      const have = here ? here[g] : 0;
+      const haveEl = document.querySelector(`[data-goal-have="${g}"]`);
+      if (haveEl) haveEl.textContent = fmt(have);
+      const needEl = document.querySelector(`[data-goal="${g}"]`);
+      if (needEl) needEl.classList.toggle('ok', have + 1e-9 >= need);
+      const elseEl = document.querySelector<HTMLElement>(`[data-goal-else="${g}"]`);
+      if (elseEl) {
+        const other = elsewhere(g);
+        if (other && have + 1e-9 < need) {
+          elseEl.hidden = false;
+          elseEl.textContent = `(${other})`;
+        } else {
+          elseEl.hidden = true;
+          elseEl.textContent = '';
+        }
       }
     }
   }
   const craftBtn = app.querySelector<HTMLButtonElement>('button[data-act="craft"]');
-  const craftErr = canCraftWorkbench(state);
+  const craftErr = canCraftCurrent(state);
   if (craftBtn) craftBtn.disabled = !!craftErr;
   const craftErrEl = document.getElementById('ui-craft-err');
-  if (craftErrEl && !state.workbenchCrafted) {
+  if (craftErrEl && currentRecipeCost(state)) {
     craftErrEl.textContent = craftErr ?? '';
   }
   paintTradePanel();
@@ -613,7 +653,7 @@ document.addEventListener('click', (e) => {
     if (syncTutorial(state, 'buy')) stepped = true;
   }
   if (act === 'cancel') cancelTravel(state);
-  if (act === 'craft') craftWorkbench(state);
+  if (act === 'craft') craftCurrent(state);
   if (act === 'pack' && good) {
     packMax(good);
     const input = app.querySelector<HTMLInputElement>(`[data-cargo="${good}"]`);
