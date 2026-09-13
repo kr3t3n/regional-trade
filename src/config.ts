@@ -113,10 +113,35 @@ export const HELP_KEY = 'regional-trade-helper';
 /**
  * Second recipe after Workbench. Must stay Vale-foreign so the brace
  * trip stays honest. Cargo +5 applies only after Timber brace crafts.
- * TRAVEL.cargoCap stays the base 40 — not a #6 paid upgrade UI.
+ * TRAVEL.cargoCap stays the base 40. Paid #6 upgrades stack on top.
  */
 export const NEXT_RECIPE_NEEDS: Good = 'timber';
 export const WORKBENCH_UNLOCK_CARGO = 5;
+
+/**
+ * Paid cargo upgrades (#6). Each tier adds capPerTier to the *current* cap.
+ * Brace +5 and paid +5 are independent and stack:
+ *   base 40 → brace 45 → first paid 50
+ *   (or paid first 45, then brace 50).
+ * Cost: coinBase × coinGrowth^n coin + goodBase × goodGrowth^n of a
+ * local good in this stash. n = owned tiers. Must stand in a region;
+ * travel still wants fee + packing. No max tier — cost is the wall.
+ */
+export const CARGO_UPGRADE = {
+  capPerTier: 5,
+  coinBase: 8,
+  coinGrowth: 1.5,
+  goodBase: 6,
+  goodGrowth: 1.25,
+} as const;
+
+export function cargoUpgradeCoinCost(owned: number): number {
+  return CARGO_UPGRADE.coinBase * Math.pow(CARGO_UPGRADE.coinGrowth, owned);
+}
+
+export function cargoUpgradeGoodCost(owned: number): number {
+  return CARGO_UPGRADE.goodBase * Math.pow(CARGO_UPGRADE.goodGrowth, owned);
+}
 
 export function recipeNeeds(cost: Partial<Record<Good, number>>): [Good, number][] {
   return (Object.entries(cost) as [Good, number][]).filter(([, n]) => n > 0);

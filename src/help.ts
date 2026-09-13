@@ -1,4 +1,5 @@
 import {
+  CARGO_UPGRADE,
   HARVEST,
   HELP_KEY,
   NPC,
@@ -57,7 +58,7 @@ export function helperMarkup(): string {
         </div>
         <div>
           <dt>Cargo</dt>
-          <dd>Cap ${TRAVEL.cargoCap} until timber brace, then ${TRAVEL.cargoCap + WORKBENCH_UNLOCK_CARGO}. Leave ${WORKBENCH_COST.grain} grain in Vale if Workbench still open.</dd>
+          <dd>Cap ${TRAVEL.cargoCap} until timber brace, then ${TRAVEL.cargoCap + WORKBENCH_UNLOCK_CARGO}. Paid upgrades add +${CARGO_UPGRADE.capPerTier} each on the current cap — coin plus a local good in this stash. Leave ${WORKBENCH_COST.grain} grain in Vale if Workbench still open.</dd>
         </div>
         <div>
           <dt>NPC spreads</dt>

@@ -31,7 +31,7 @@ Asset URLs are prefixed by Vite `base` so they do not 404 on a subdirectory.
 
 Override either host with `VITE_BASE=/your/path/ npm run build`, or set `GITHUB_PAGES=1` to force `/regional-trade/`.
 
-Progress (stash per region, nodes, coin, energy, region, in-transit cargo, Workbench, Timber brace) is saved to **localStorage** (`regional-trade-v1`). There is a **Reset save** button. Offline catch-up is **off**: closing the tab does not grant idle, energy, or travel credit.
+Progress (stash per region, nodes, coin, energy, region, in-transit cargo, Workbench, Timber brace, cargo upgrades) is saved to **localStorage** (`regional-trade-v1`). There is a **Reset save** button. Offline catch-up is **off**: closing the tab does not grant idle, energy, or travel credit.
 
 **Help** is toggleable Field notes (concepts, not the first-trip walk). First visit stays closed and stores `regional-trade-helper=off`; it never auto-reopens after that. Reset save does not clear that preference.
 
@@ -72,6 +72,7 @@ No server routes, no environment variables, no DNS changes required.
 5. Keep 2 ore (or timber) for the return fee. Depart Vale with **20 ore** in cargo.
 6. In Vale, craft **Workbench** (20 grain left at home + 20 ore). The complete screen says the bench stands and the next board wants timber — foreign in Vale. Cargo cap stays **40**.
 7. Haul **20 timber** home (Ridge harvest or buy abroad). Leave **15 grain** in the Vale stash. Craft **Timber brace**. That spend cannot finish from Vale harvest. Cargo cap becomes **45**.
+8. **Cargo upgrades** (Travel panel): current cap, next +5 cost (coin + a local good here), Buy. Paid tiers stack on the current cap — brace then paid → 50, or paid then brace → 50. Travel still wants fee + packing.
 
 Honesty: cannot craft Workbench without leaving Vale (ore is foreign there); cannot craft Timber brace without timber (also foreign in Vale); idle pauses in transit; arrival tick does not grant a full idle slice; NPC spreads stay in `src/config.ts`.
 
@@ -79,7 +80,7 @@ Honesty: cannot craft Workbench without leaving Vale (ore is foreign there); can
 
 | Path | Role |
 |---|---|
-| `src/config.ts` | All V1 numbers (regions, harvest, energy, travel, NPC spreads, Workbench, Timber brace, save key) |
+| `src/config.ts` | All V1 numbers (regions, harvest, energy, travel, NPC spreads, Workbench, Timber brace, cargo upgrades, save key) |
 | `src/game.ts` | State + tick + actions |
 | `src/persist.ts` | localStorage save/load/reset (no offline catch-up) |
 | `src/main.ts` | One-screen UI (NPC totals = amount × unit, live) |
