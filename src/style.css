@@ -1612,6 +1612,14 @@ body.haul-on .place-harvest-wall {
     min-height: 2.6rem;
   }
 
+  .place-harvest-wall {
+    display: none;
+  }
+
+  .place:has(.road-hud) .coach {
+    display: none;
+  }
+
   .log-fold {
     margin: 0.55rem 0.7rem 1rem;
   }

@@ -506,7 +506,7 @@ function render() {
     : 0;
 
   const mark = coachTarget(state);
-  const haulOn = !state.tutorial.splash && !state.tutorial.dismissed && !state.workbenchCrafted;
+  const haulOn = !state.tutorial.dismissed && !state.workbenchCrafted;
   document.body.classList.toggle('haul-on', haulOn);
 
   app.innerHTML = `
@@ -530,7 +530,7 @@ function render() {
         desk,
         energyHtml: placeEnergyLine(state.energy, HARVEST.energyCap, energyPct),
         goalHtml: goalBlock(),
-        harvestHtml: inRegion && region && stash ? harvestScene(region, stash, mark) : '',
+        harvestHtml: inRegion && region && stash && !haulOn ? harvestScene(region, stash, mark) : '',
         coachVale: mark === 'vale',
         verbHtml: state.tutorial.splash ? '' : verbMarkup(state),
         beatHtml: coachMarkup(state),
