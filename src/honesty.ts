@@ -1,5 +1,6 @@
 /**
- * Honesty checks for the Workbench + Timber brace gates. Run: npx tsx src/honesty.ts
+ * Honesty checks for the Workbench + Timber brace gates and paid cargo.
+ * Run: npx tsx src/honesty.ts
  * Vale cannot harvest ore or timber; crafts need travel; NPC spreads stay in config.
  */
 import {
@@ -12,6 +13,9 @@ import {
   craftTimberBrace,
   canDepart,
   cargoCap,
+  cargoUpgradeCost,
+  canBuyCargoUpgrade,
+  buyCargoUpgrade,
   tick,
   depart,
   sellToNpc,
@@ -24,6 +28,7 @@ import {
   TRAVEL,
   NEXT_RECIPE_NEEDS,
   WORKBENCH_UNLOCK_CARGO,
+  CARGO_UPGRADE,
   TIMBER_BRACE_COST,
   recipeNeeds,
 } from './game';
@@ -198,6 +203,97 @@ export function honestyReport(): string[] {
   });
   if (overBrace) errors.push(`brace cap 45 should allow 41 cargo, got: ${overBrace}`);
 
+  if (CARGO_UPGRADE.capPerTier !== 5) errors.push(`paid cargo tier ${CARGO_UPGRADE.capPerTier} ≠ 5`);
+  const firstCost = cargoUpgradeCost(0);
+  const secondCost = cargoUpgradeCost(1);
+  if (firstCost.coin !== CARGO_UPGRADE.coinBase || firstCost.goodAmount !== CARGO_UPGRADE.goodBase) {
+    errors.push('first cargo upgrade cost must match CARGO_UPGRADE bases');
+  }
+  if (secondCost.coin <= firstCost.coin || secondCost.goodAmount <= firstCost.goodAmount) {
+    errors.push('cargo upgrade cost must rise each tier');
+  }
+
+  const cart = createInitialState();
+  cart.stashes.vale.grain = 80;
+  cart.coin = firstCost.coin;
+  if (canBuyCargoUpgrade(cart, 'ore') === null) {
+    errors.push('cargo upgrade should reject a Vale-foreign good');
+  }
+  if (canBuyCargoUpgrade(cart, 'grain') !== null) {
+    errors.push(`Vale with coin + grain should buy first cart, got: ${canBuyCargoUpgrade(cart, 'grain')}`);
+  }
+  if (!buyCargoUpgrade(cart, 'grain') || cart.cargoUpgrades !== 1) {
+    errors.push('first paid cargo upgrade failed');
+  }
+  if (cargoCap(cart) !== 45) {
+    errors.push(`paid upgrade without brace should be 45, got ${cargoCap(cart)}`);
+  }
+  if (Math.abs(cart.coin) > 1e-9) errors.push('cargo upgrade must spend coin');
+  if (Math.abs(cart.stashes.vale.grain - (80 - firstCost.goodAmount)) > 1e-9) {
+    errors.push('cargo upgrade must spend the local good');
+  }
+  if (canBuyCargoUpgrade(cart, 'grain') === null) {
+    errors.push('second cart should be blocked after spending first-tier coin');
+  }
+  cart.coin = secondCost.coin;
+  cart.stashes.vale.grain = secondCost.goodAmount;
+  if (!buyCargoUpgrade(cart, 'grain') || cargoCap(cart) !== 50) {
+    errors.push(`second paid upgrade should raise cap to 50, got ${cargoCap(cart)}`);
+  }
+
+  const stacked = createInitialState();
+  stacked.timberBraceCrafted = true;
+  stacked.cargoUpgrades = 1;
+  if (cargoCap(stacked) !== 50) {
+    errors.push(`brace + one paid tier should be 50, got ${cargoCap(stacked)}`);
+  }
+  const paidThenBrace = createInitialState();
+  paidThenBrace.cargoUpgrades = 1;
+  if (cargoCap(paidThenBrace) !== 45) {
+    errors.push(`one paid tier without brace should be 45, got ${cargoCap(paidThenBrace)}`);
+  }
+  paidThenBrace.timberBraceCrafted = true;
+  if (cargoCap(paidThenBrace) !== 50) {
+    errors.push(`paid then brace should stack to 50, got ${cargoCap(paidThenBrace)}`);
+  }
+
+  const roadCart = createInitialState();
+  roadCart.stashes.vale.grain = 40;
+  roadCart.coin = firstCost.coin;
+  depart(roadCart, {
+    to: 'ridge',
+    cargo: { grain: 10, ore: 0, timber: 0, fibre: 0 },
+    feeGood: 'grain',
+  });
+  if (canBuyCargoUpgrade(roadCart, 'grain') === null) {
+    errors.push('cargo upgrade must not buy in transit');
+  }
+  const feeStill = createInitialState();
+  feeStill.cargoUpgrades = 2;
+  feeStill.stashes.vale.grain = 1;
+  const noFee = canDepart(feeStill, {
+    to: 'ridge',
+    cargo: { grain: 0, ore: 0, timber: 0, fibre: 0 },
+    feeGood: 'grain',
+  });
+  if (!noFee) errors.push('wider cart must still pay the local travel fee');
+  const packedWide = createInitialState();
+  packedWide.timberBraceCrafted = true;
+  packedWide.cargoUpgrades = 1;
+  packedWide.stashes.vale.grain = 60;
+  const overPaid = canDepart(packedWide, {
+    to: 'ridge',
+    cargo: { grain: 51, ore: 0, timber: 0, fibre: 0 },
+    feeGood: 'grain',
+  });
+  if (!overPaid) errors.push('brace + paid cap 50 should reject 51 cargo');
+  const atPaid = canDepart(packedWide, {
+    to: 'ridge',
+    cargo: { grain: 50, ore: 0, timber: 0, fibre: 0 },
+    feeGood: 'grain',
+  });
+  if (atPaid) errors.push(`brace + paid cap 50 should allow 50 cargo, got: ${atPaid}`);
+
   // Sell/buy spreads: not 1:1. Confirm = amount × unit (coin only, no barter).
   const m = createInitialState();
   m.region = 'ridge';
@@ -251,6 +347,9 @@ export function honestyReport(): string[] {
   }
   if (!/timber brace/i.test(notes)) {
     errors.push('Field notes craft missing timber brace');
+  }
+  if (!/paid upgrade/i.test(notes)) {
+    errors.push('Field notes cargo missing paid upgrades');
   }
   if (/honesty|free travel/i.test(FIELD_NOTES_CRAFT) || /honesty|free travel/i.test(notes)) {
     errors.push('Field notes must not spoil honesty suite');
@@ -381,6 +480,7 @@ export function honestyReport(): string[] {
       errors.push('persist lost tutorial dismiss / step');
     }
     if (loaded.timberBraceCrafted) errors.push('persist invented timber brace');
+    if (loaded.cargoUpgrades !== 0) errors.push('persist invented cargo upgrades');
   }
   const bracedSave = createInitialState();
   bracedSave.workbenchCrafted = true;
@@ -392,6 +492,29 @@ export function honestyReport(): string[] {
   const bracedLoaded = loadGame();
   if (!bracedLoaded?.timberBraceCrafted || cargoCap(bracedLoaded) !== 45) {
     errors.push('persist lost timber brace / cargo +5');
+  }
+  if (bracedLoaded?.cargoUpgrades !== 0) errors.push('brace persist invented paid cargo tiers');
+  const cartSave = createInitialState();
+  cartSave.workbenchCrafted = true;
+  cartSave.timberBraceCrafted = true;
+  cartSave.cargoUpgrades = 2;
+  cartSave.tutorial.splash = false;
+  cartSave.tutorial.dismissed = true;
+  cartSave.tutorial.step = 8;
+  saveGame(cartSave);
+  const cartLoaded = loadGame();
+  if (!cartLoaded || cartLoaded.cargoUpgrades !== 2 || cargoCap(cartLoaded) !== 55) {
+    errors.push('persist lost paid cargo upgrades / stacked cap');
+  }
+  const rawCart = localStorage.getItem(SAVE_KEY);
+  if (rawCart) {
+    const parsed = JSON.parse(rawCart) as { cargoUpgrades?: number };
+    delete parsed.cargoUpgrades;
+    localStorage.setItem(SAVE_KEY, JSON.stringify(parsed));
+    const migratedCart = loadGame();
+    if (migratedCart?.cargoUpgrades !== 0) {
+      errors.push('legacy save without cargoUpgrades should load 0 paid tiers');
+    }
   }
   const raw = localStorage.getItem(SAVE_KEY);
   if (raw) {
@@ -406,6 +529,9 @@ export function honestyReport(): string[] {
   const reset = resetGame();
   if (reset.stashes.vale.grain !== 0 || reset.energy !== HARVEST.energyCap) {
     errors.push('resetGame did not restore initial stash/energy');
+  }
+  if (reset.cargoUpgrades !== 0 || cargoCap(reset) !== 40) {
+    errors.push('reset must clear paid cargo upgrades back to cap 40');
   }
   if (!reset.tutorial.splash || reset.tutorial.step !== 0 || reset.tutorial.dismissed) {
     errors.push('reset must restart splash + T0–T8');
@@ -424,4 +550,4 @@ if (errors.length) {
   console.error('Honesty failed:\n' + errors.map((e) => ` - ${e}`).join('\n'));
   throw new Error('honesty');
 }
-console.log('Honesty ok: Vale cannot harvest ore or timber; Workbench then Timber brace; cargo +5 only after brace; Ridge ore 1.3P; no transit idle; no arrival full-tick credit.');
+console.log('Honesty ok: Vale cannot harvest ore or timber; Workbench then Timber brace; cargo +5 only after brace; paid cart stacks on current cap; Ridge ore 1.3P; no transit idle; no arrival full-tick credit.');

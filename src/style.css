@@ -676,6 +676,33 @@ select {
   align-items: center;
 }
 
+.cargo-upgrade {
+  margin-top: 0.65rem;
+  padding: 0.55rem 0.65rem 0.6rem;
+  background: #eef1f6;
+  border: 1px solid #c9d0dc;
+  border-radius: 8px;
+}
+
+.cargo-upgrade-now {
+  margin: 0.1rem 0 0;
+  font-family: var(--font-display);
+  font-size: 1.02rem;
+}
+
+.cargo-upgrade .meta {
+  margin-bottom: 0.15rem;
+}
+
+.cargo-upgrade .row {
+  margin-top: 0.35rem;
+}
+
+.cargo-upgrade button[data-act='cargo-upgrade'] {
+  background: var(--transit);
+  border-color: #2f3d58;
+}
+
 .gchip {
   display: inline-flex;
   align-items: center;

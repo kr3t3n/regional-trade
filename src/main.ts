@@ -13,6 +13,9 @@ import {
   canCraftCurrent,
   currentRecipeCost,
   cargoCap,
+  cargoUpgradeCost,
+  canBuyCargoUpgrade,
+  buyCargoUpgrade,
   upgradeNode,
   nodeUpgradeCost,
   nodeLevel,
@@ -22,6 +25,8 @@ import {
   REGIONS,
   HARVEST,
   TRAVEL,
+  CARGO_UPGRADE,
+  WORKBENCH_UNLOCK_CARGO,
   WORKBENCH_COST,
   TIMBER_BRACE_COST,
   recipeNeeds,
@@ -52,6 +57,7 @@ import { MISSION } from './mission';
 let state: GameState = loadGame() ?? createInitialState();
 const cargoPick: Inventory = { grain: 0, ore: 0, timber: 0, fibre: 0 };
 let feeGood: Good = 'grain';
+let upgradeGood: Good = 'grain';
 let tradeAmount = 1;
 let destPick: RegionId = 'ridge';
 let helpOpen = loadHelpOpen();
@@ -89,6 +95,8 @@ function readForm() {
   });
   const fee = app.querySelector<HTMLSelectElement>('#feeGood');
   if (fee) feeGood = fee.value as Good;
+  const pay = app.querySelector<HTMLSelectElement>('#upgradeGood');
+  if (pay) upgradeGood = pay.value as Good;
   const amt = app.querySelector<HTMLInputElement>('#tradeAmt');
   if (amt) tradeAmount = Math.max(1, Math.floor(Number(amt.value) || 1));
   const dest = app.querySelector<HTMLSelectElement>('#dest');
@@ -113,11 +121,49 @@ function cargoHint(): string {
   return '';
 }
 
+function cargoCapBreakdown(): string {
+  const bits = [`${TRAVEL.cargoCap} base`];
+  if (state.timberBraceCrafted) bits.push(`+${WORKBENCH_UNLOCK_CARGO} brace`);
+  if (state.cargoUpgrades > 0) {
+    bits.push(`+${state.cargoUpgrades * CARGO_UPGRADE.capPerTier} paid`);
+  }
+  return `Cap ${cargoCap(state)} (${bits.join(' ')})`;
+}
+
 function writeCargoTotal() {
   const el = document.getElementById('ui-cargo-total');
   if (el) {
     el.textContent = `Cargo ${fmt(cargoTotalPick())} / ${cargoCap(state)}${cargoHint()}`;
   }
+  const capEl = document.getElementById('ui-cargo-cap');
+  if (capEl) capEl.textContent = cargoCapBreakdown();
+}
+
+function cargoUpgradePanel(region: (typeof REGIONS)[RegionId]): string {
+  const next = cargoUpgradeCost(state.cargoUpgrades);
+  const err = canBuyCargoUpgrade(state, upgradeGood);
+  return `
+            <div class="cargo-upgrade">
+              <p class="lbl">Cart</p>
+              <p class="cargo-upgrade-now" id="ui-cargo-cap">${cargoCapBreakdown()}</p>
+              <p class="meta" id="ui-cargo-upgrade-cost">Next +${CARGO_UPGRADE.capPerTier} · ${fmt(next.coin)} coin + ${fmt(next.goodAmount)} ${GOOD_LABEL[upgradeGood]}</p>
+              <div class="row">
+                <label>Pay with
+                  <select id="upgradeGood">
+                    ${region.local
+                      .map(
+                        (g) =>
+                          `<option value="${g}" ${g === upgradeGood ? 'selected' : ''}>${GOOD_LABEL[g]}</option>`
+                      )
+                      .join('')}
+                  </select>
+                </label>
+                <button type="button" data-act="cargo-upgrade" ${err ? 'disabled' : ''}>
+                  Buy cargo +${CARGO_UPGRADE.capPerTier}
+                </button>
+              </div>
+              <p class="hint" id="ui-cargo-upgrade-err">${err ?? ''}</p>
+            </div>`;
 }
 
 function packMax(good: Good) {
@@ -248,6 +294,7 @@ function render() {
   const stash = state.region ? state.stashes[state.region] : null;
 
   if (region && !region.local.includes(feeGood)) feeGood = region.local[0];
+  if (region && !region.local.includes(upgradeGood)) upgradeGood = region.local[0];
   if (region && destPick === region.id) {
     destPick = REGION_IDS.find((id) => id !== region.id) ?? 'ridge';
   }
@@ -447,6 +494,7 @@ function render() {
               <button type="button" data-act="depart">Depart (${destSecs}s)</button>
             </div>
             <p class="meta" id="ui-cargo-total">Cargo ${fmt(cargoTotalPick())} / ${cargoCap(state)}${cargoHint()}</p>
+            ${cargoUpgradePanel(region)}
           </section>
 
           ${craftPanel()}
@@ -511,6 +559,17 @@ function paintLive() {
     const stash = state.region ? state.stashes[state.region] : null;
     btn.disabled = cost === null || !stash || stash[g] < cost;
   });
+  const cargoUpBtn = app.querySelector<HTMLButtonElement>('button[data-act="cargo-upgrade"]');
+  const cargoUpErr = canBuyCargoUpgrade(state, upgradeGood);
+  if (cargoUpBtn) cargoUpBtn.disabled = !!cargoUpErr;
+  const cargoUpErrEl = document.getElementById('ui-cargo-upgrade-err');
+  if (cargoUpErrEl) cargoUpErrEl.textContent = cargoUpErr ?? '';
+  const cargoUpCostEl = document.getElementById('ui-cargo-upgrade-cost');
+  if (cargoUpCostEl) {
+    const next = cargoUpgradeCost(state.cargoUpgrades);
+    cargoUpCostEl.textContent = `Next +${CARGO_UPGRADE.capPerTier} · ${fmt(next.coin)} coin + ${fmt(next.goodAmount)} ${GOOD_LABEL[upgradeGood]}`;
+  }
+  writeCargoTotal();
 
   const here = state.region && !state.travel ? state.stashes[state.region] : null;
   const liveCost = currentRecipeCost(state);
@@ -630,6 +689,7 @@ document.addEventListener('click', (e) => {
     GOODS.forEach((g) => (cargoPick[g] = 0));
     destPick = 'ridge';
     feeGood = 'grain';
+    upgradeGood = 'grain';
     dirty = true;
     render();
     return;
@@ -644,6 +704,7 @@ document.addEventListener('click', (e) => {
     if (syncTutorial(state, 'harvest')) stepped = true;
   }
   if (act === 'upgrade' && good) upgradeNode(state, good);
+  if (act === 'cargo-upgrade') buyCargoUpgrade(state, upgradeGood);
   if (act === 'sell' && good) {
     sellToNpc(state, good, tradeAmount);
     if (syncTutorial(state, 'sell')) stepped = true;
@@ -680,6 +741,7 @@ document.addEventListener('click', (e) => {
     stepped ||
     act === 'craft' ||
     act === 'upgrade' ||
+    act === 'cargo-upgrade' ||
     act === 'sell' ||
     act === 'buy' ||
     act === 'depart' ||
@@ -690,6 +752,7 @@ document.addEventListener('click', (e) => {
 app.addEventListener('input', () => {
   readForm();
   writeCargoTotal();
+  paintLive();
   paintTradePanel();
 });
 

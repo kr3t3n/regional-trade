@@ -40,6 +40,7 @@ interface SaveV1 {
   travel: TravelState | null;
   workbenchCrafted: boolean;
   timberBraceCrafted?: boolean;
+  cargoUpgrades?: number;
   log: string[];
   tutorial?: TutorialState;
 }
@@ -131,6 +132,7 @@ export function saveGame(state: GameState): void {
       : null,
     workbenchCrafted: state.workbenchCrafted,
     timberBraceCrafted: state.timberBraceCrafted,
+    cargoUpgrades: state.cargoUpgrades,
     log: state.log.slice(0, 8),
     tutorial: { ...state.tutorial },
   };
@@ -205,10 +207,21 @@ export function loadGame(): GameState | null {
       : [];
 
     const timberBraceCrafted = data.timberBraceCrafted === true;
+    if (data.cargoUpgrades !== undefined) {
+      if (
+        typeof data.cargoUpgrades !== 'number' ||
+        !Number.isInteger(data.cargoUpgrades) ||
+        data.cargoUpgrades < 0
+      ) {
+        return null;
+      }
+    }
+    const cargoUpgrades = data.cargoUpgrades ?? 0;
 
     const hasProgress =
       data.workbenchCrafted ||
       timberBraceCrafted ||
+      cargoUpgrades > 0 ||
       !!travel ||
       data.coin > 0 ||
       energy < HARVEST.energyCap ||
@@ -235,6 +248,7 @@ export function loadGame(): GameState | null {
       travel,
       workbenchCrafted: data.workbenchCrafted,
       timberBraceCrafted,
+      cargoUpgrades,
       log: log.length ? log : fresh.log,
       tutorial,
     };

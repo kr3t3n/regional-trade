@@ -9,6 +9,9 @@ import {
   TIMBER_BRACE_COST,
   NEXT_RECIPE_NEEDS,
   WORKBENCH_UNLOCK_CARGO,
+  CARGO_UPGRADE,
+  cargoUpgradeCoinCost,
+  cargoUpgradeGoodCost,
   TICK_HZ,
   SAVE_KEY,
   OFFLINE_CATCHUP_SECONDS,
@@ -50,6 +53,8 @@ export interface GameState {
   travel: TravelState | null;
   workbenchCrafted: boolean;
   timberBraceCrafted: boolean;
+  /** Paid cargo tiers (#6). Stacks on base + brace. */
+  cargoUpgrades: number;
   log: string[];
   tutorial: TutorialState;
 }
@@ -87,14 +92,31 @@ export function createInitialState(): GameState {
     travel: null,
     workbenchCrafted: false,
     timberBraceCrafted: false,
+    cargoUpgrades: 0,
     log: [T0_LOG],
     tutorial: createTutorialState(),
   };
 }
 
-/** Live cargo cap. Base 40 until Timber brace; then +5. Not a #6 paid upgrade. */
-export function cargoCap(state: Pick<GameState, 'timberBraceCrafted'>): number {
-  return TRAVEL.cargoCap + (state.timberBraceCrafted ? WORKBENCH_UNLOCK_CARGO : 0);
+/**
+ * Live cargo cap. Base 40 + brace +5 (if crafted) + paid tiers × 5.
+ * Paid upgrades are relative to the current cap, not a replacement for brace.
+ */
+export function cargoCap(
+  state: Pick<GameState, 'timberBraceCrafted' | 'cargoUpgrades'>
+): number {
+  return (
+    TRAVEL.cargoCap +
+    (state.timberBraceCrafted ? WORKBENCH_UNLOCK_CARGO : 0) +
+    state.cargoUpgrades * CARGO_UPGRADE.capPerTier
+  );
+}
+
+export function cargoUpgradeCost(owned: number): { coin: number; goodAmount: number } {
+  return {
+    coin: cargoUpgradeCoinCost(owned),
+    goodAmount: cargoUpgradeGoodCost(owned),
+  };
 }
 
 function pushLog(state: GameState, msg: string) {
@@ -144,6 +166,39 @@ export function upgradeNode(state: GameState, good: Good): boolean {
   stash[good] -= cost;
   state.nodes[state.region][good] = (state.nodes[state.region][good] ?? 0) + 1;
   pushLog(state, `Upgraded ${good} node in ${REGIONS[state.region].name} (lv ${state.nodes[state.region][good]}).`);
+  return true;
+}
+
+/**
+ * Paid cargo +5. Coin from sales + a local good in this stash.
+ * Available alongside brace — does not replace the brace +5.
+ */
+export function canBuyCargoUpgrade(state: GameState, good: Good): string | null {
+  if (!state.region || state.travel) return 'Must be in a region.';
+  if (!REGIONS[state.region].local.includes(good)) return 'Cost must be a local good.';
+  const { coin, goodAmount } = cargoUpgradeCost(state.cargoUpgrades);
+  if (state.coin + 1e-9 < coin) {
+    return `Need ${coin.toFixed(2)} coin (have ${state.coin.toFixed(2)}).`;
+  }
+  const stash = currentStash(state)!;
+  if (stash[good] + 1e-9 < goodAmount) {
+    return `Need ${goodAmount.toFixed(1)} ${good} here (have ${stash[good].toFixed(1)}).`;
+  }
+  return null;
+}
+
+export function buyCargoUpgrade(state: GameState, good: Good): boolean {
+  const err = canBuyCargoUpgrade(state, good);
+  if (err) {
+    pushLog(state, err);
+    return false;
+  }
+  const { coin, goodAmount } = cargoUpgradeCost(state.cargoUpgrades);
+  const stash = currentStash(state)!;
+  state.coin -= coin;
+  stash[good] -= goodAmount;
+  state.cargoUpgrades += 1;
+  pushLog(state, `Cart holds ${cargoCap(state)}.`);
   return true;
 }
 
@@ -413,6 +468,9 @@ export {
   TIMBER_BRACE_COST,
   NEXT_RECIPE_NEEDS,
   WORKBENCH_UNLOCK_CARGO,
+  CARGO_UPGRADE,
+  cargoUpgradeCoinCost,
+  cargoUpgradeGoodCost,
   recipeNeeds,
   recipeLabel,
   TICK_HZ,

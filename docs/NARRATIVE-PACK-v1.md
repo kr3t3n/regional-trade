@@ -50,7 +50,7 @@ Optional region labels: Vale Fields / Ridge Heights / Cross Way.
 
 - **Harvest.** Click +1 local while you stand there. Idle +0.2/s × node in-region only — quiet on the road. Energy 30, regen 1 / 2s.
 - **Travel.** Fee 2 local. Nowhere while moving. Vale↔Ridge 25s; via Cross 20s+20s. Cancel burns fee; cargo comes home. No teleport.
-- **Cargo.** Cap 40 until timber brace, then 45. Leave 20 grain in Vale if Workbench still open.
+- **Cargo.** Cap 40 until timber brace, then 45. Paid upgrades add +5 each on the current cap — coin plus a local good in this stash. Leave 20 grain in Vale if Workbench still open.
 - **NPC spreads.** Coin only; amount × unit. Local buy 0.7P / sell 1.3P. Foreign buy 1.05P / sell 1.15P. Ridge ore 1.3. No 1:1. No global board.
 - **Coin.** Only from NPC sales.
 - **Craft gates.** Workbench: 20 grain + 20 ore in *this* stash. First reason to leave home — Vale cannot harvest ore. After it stands, the next recipe still spends timber (foreign in Vale), plus cargo +5. Next: timber brace — still a foreign spend in Vale. Workbench was the first haul; this one proves the loop.
@@ -64,6 +64,7 @@ Optional region labels: Vale Fields / Ridge Heights / Cross Way.
 - Bought N ore.
 - Workbench stands in Vale.
 - Timber brace set in Vale.
+- Cart holds 50.
 
 Cancel: Turned back. Fee burned. Cargo returned to Vale.
 
