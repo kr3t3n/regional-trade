@@ -32,8 +32,8 @@ import {
   recipeNeeds,
   recipeLabel,
   TICK_HZ,
-  npcBuyPrice,
-  npcSellPrice,
+  quotedBuyPrice,
+  quotedSellPrice,
   npcTradeTotal,
   travelSeconds,
   type GameState,
@@ -181,6 +181,16 @@ function elsewhere(good: Good): string {
     (id) => `${fmt(state.stashes[id][good])} in ${REGIONS[id].name}`
   );
   return bits.length ? bits.join(', ') : '';
+}
+
+function stockLine(regionId: RegionId, good: Good): string {
+  const book = state.npcBooks[regionId][good];
+  const shelf = book.sell;
+  const take = book.buy;
+  if (shelf <= 1e-9 && take <= 1e-9) return 'Empty. Restock is slow.';
+  if (shelf <= 1e-9) return `Shelf empty · takes ${fmt(take)}`;
+  if (take <= 1e-9) return `${fmt(shelf)} on the shelf · takes none`;
+  return `${fmt(shelf)} on the shelf · takes ${fmt(take)}`;
 }
 
 function recipeChips(cost: Partial<Record<Good, number>>): string {
@@ -410,7 +420,7 @@ function render() {
 
           <section class="panel npc${mark === 'market' ? ' coach-target' : ''}">
             <h2>${panelMark('market')} NPC market <span class="muted">${region.name}</span></h2>
-            <p class="hint">Coin only. Sell for coin, buy with coin. No barter.</p>
+            <p class="hint">Coin only. Sell for coin, buy with coin. No barter. One haul empties a book — restock is slower than the Ridge road.</p>
             <div class="trade-amt">
               <label for="tradeAmt">Amount</label>
               <input type="number" id="tradeAmt" min="1" step="1" value="${tradeAmount}" />
@@ -427,20 +437,25 @@ function render() {
               </thead>
               <tbody>
                 ${GOODS.map((g) => {
-                  const buyP = npcBuyPrice(region.id, g);
-                  const sellP = npcSellPrice(region.id, g);
+                  const buyP = quotedBuyPrice(state, region.id, g);
+                  const sellP = quotedSellPrice(state, region.id, g);
                   const sellTotal = npcTradeTotal(buyP, tradeAmount);
                   const buyTotal = npcTradeTotal(sellP, tradeAmount);
                   const tag = region.local.includes(g) ? 'local' : 'foreign';
-                  return `<tr class="${tag}">
-                    <td>${goodChip(g)}</td>
+                  const line = stockLine(region.id, g);
+                  const empty = line.startsWith('Empty');
+                  return `<tr class="${tag}${empty ? ' book-empty' : ''}">
+                    <td>
+                      ${goodChip(g)}
+                      <span class="stock-line${empty ? ' empty' : ''}" data-stock-line="${g}">${line}</span>
+                    </td>
                     <td class="price">
-                      <span class="unit">${buyP.toFixed(2)} <span class="per">/ea</span></span>
+                      <span class="unit" data-trade-unit="sell" data-good="${g}">${buyP.toFixed(2)} <span class="per">/ea</span></span>
                       <strong class="total" data-trade-total="sell" data-good="${g}" data-unit="${buyP}">${sellTotal.toFixed(2)}</strong>
                       <span class="coin-lbl">coin</span>
                     </td>
                     <td class="price">
-                      <span class="unit">${sellP.toFixed(2)} <span class="per">/ea</span></span>
+                      <span class="unit" data-trade-unit="buy" data-good="${g}">${sellP.toFixed(2)} <span class="per">/ea</span></span>
                       <strong class="total" data-trade-total="buy" data-good="${g}" data-unit="${sellP}">${buyTotal.toFixed(2)}</strong>
                       <span class="coin-lbl">coin</span>
                     </td>
@@ -606,6 +621,29 @@ function paintLive() {
 function paintTradePanel() {
   const region = state.region && !state.travel ? REGIONS[state.region] : null;
   const stash = state.region && !state.travel ? state.stashes[state.region] : null;
+  if (region) {
+    for (const g of GOODS) {
+      const buyP = quotedBuyPrice(state, region.id, g);
+      const sellP = quotedSellPrice(state, region.id, g);
+      const line = stockLine(region.id, g);
+      const empty = line.startsWith('Empty');
+      const stockEl = app.querySelector(`[data-stock-line="${g}"]`);
+      if (stockEl) {
+        stockEl.textContent = line;
+        stockEl.classList.toggle('empty', empty);
+      }
+      const row = stockEl?.closest('tr');
+      if (row) row.classList.toggle('book-empty', empty);
+      const sellUnit = app.querySelector(`[data-trade-unit="sell"][data-good="${g}"]`);
+      if (sellUnit) sellUnit.innerHTML = `${buyP.toFixed(2)} <span class="per">/ea</span>`;
+      const buyUnit = app.querySelector(`[data-trade-unit="buy"][data-good="${g}"]`);
+      if (buyUnit) buyUnit.innerHTML = `${sellP.toFixed(2)} <span class="per">/ea</span>`;
+      const sellTotal = app.querySelector<HTMLElement>(`[data-trade-total="sell"][data-good="${g}"]`);
+      if (sellTotal) sellTotal.dataset.unit = String(buyP);
+      const buyTotal = app.querySelector<HTMLElement>(`[data-trade-total="buy"][data-good="${g}"]`);
+      if (buyTotal) buyTotal.dataset.unit = String(sellP);
+    }
+  }
   app.querySelectorAll<HTMLElement>('[data-trade-total]').forEach((el) => {
     const unit = Number(el.dataset.unit);
     if (!Number.isFinite(unit)) return;
@@ -614,16 +652,28 @@ function paintTradePanel() {
     const good = el.dataset.good as Good | undefined;
     const side = el.dataset.tradeTotal;
     const cell = el.closest('td');
-    if (!cell || !good || !stash) return;
+    if (!cell || !good || !stash || !region) return;
+    const book = state.npcBooks[region.id][good];
     if (side === 'sell') {
-      cell.classList.toggle('short', stash[good] + 1e-9 < tradeAmount);
+      cell.classList.toggle(
+        'short',
+        stash[good] + 1e-9 < tradeAmount || book.buy + 1e-9 < tradeAmount
+      );
     } else if (side === 'buy') {
-      cell.classList.toggle('short', state.coin + 1e-9 < total);
+      cell.classList.toggle(
+        'short',
+        state.coin + 1e-9 < total || book.sell + 1e-9 < tradeAmount
+      );
     }
   });
   app.querySelectorAll<HTMLButtonElement>('button[data-act="sell"]').forEach((btn) => {
     const g = btn.dataset.good as Good;
-    btn.disabled = !stash || stash[g] + 1e-9 < tradeAmount;
+    if (!stash || !region) {
+      btn.disabled = true;
+      return;
+    }
+    const take = state.npcBooks[region.id][g].buy;
+    btn.disabled = stash[g] + 1e-9 < tradeAmount || take + 1e-9 < tradeAmount;
   });
   app.querySelectorAll<HTMLButtonElement>('button[data-act="buy"]').forEach((btn) => {
     const g = btn.dataset.good as Good;
@@ -631,8 +681,9 @@ function paintTradePanel() {
       btn.disabled = true;
       return;
     }
-    const total = npcTradeTotal(npcSellPrice(region.id, g), tradeAmount);
-    btn.disabled = state.coin + 1e-9 < total;
+    const shelf = state.npcBooks[region.id][g].sell;
+    const total = npcTradeTotal(quotedSellPrice(state, region.id, g), tradeAmount);
+    btn.disabled = state.coin + 1e-9 < total || shelf + 1e-9 < tradeAmount;
   });
 }
 

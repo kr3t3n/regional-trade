@@ -30,7 +30,12 @@ import {
   WORKBENCH_UNLOCK_CARGO,
   CARGO_UPGRADE,
   TIMBER_BRACE_COST,
+  NPC_STOCK,
+  npcStockCap,
+  quotedBuyPrice,
+  quotedSellPrice,
   recipeNeeds,
+  travelSeconds,
 } from './game';
 import { saveGame, loadGame, resetGame, clearSave } from './persist';
 import { HELP_KEY, SAVE_KEY } from './config';
@@ -322,6 +327,106 @@ export function honestyReport(): string[] {
     errors.push(`buy confirm must spend amount × unit, got ${bulk.coin}`);
   }
 
+  if (NPC_STOCK.timberMax > 20) errors.push(`timber book ${NPC_STOCK.timberMax} > 20`);
+  if (NPC_STOCK.generalMax > 40) errors.push(`general book ${NPC_STOCK.generalMax} > 40`);
+  if (NPC_STOCK.restockSeconds <= travelSeconds('vale', 'ridge')) {
+    errors.push('restock must be slower than Vale↔Ridge');
+  }
+  if (npcStockCap('ridge', 'timber') > 20 || npcStockCap('cross', 'timber') > 20) {
+    errors.push('Ridge/Cross timber stock must be ≤ 20 (one brace haul)');
+  }
+  if (npcStockCap('vale', 'grain') > 40 || npcStockCap('ridge', 'ore') > 40) {
+    errors.push('general NPC stock must be ≤ one cargo (40)');
+  }
+  if ((TIMBER_BRACE_COST.timber ?? 0) > npcStockCap('ridge', 'timber')) {
+    errors.push('one brace timber buy must be able to empty the Ridge shelf');
+  }
+
+  const timberShelf = createInitialState();
+  timberShelf.region = 'ridge';
+  timberShelf.coin = 40;
+  if (!buyFromNpc(timberShelf, 'timber', 20)) {
+    errors.push('full Ridge timber shelf should sell a brace haul');
+  }
+  if (timberShelf.npcBooks.ridge.timber.sell > 1e-9) {
+    errors.push('Ridge timber shelf should empty after 20');
+  }
+  if (buyFromNpc(timberShelf, 'timber', 1)) {
+    errors.push('empty Ridge timber shelf should block');
+  }
+  const emptyAsk = quotedSellPrice(timberShelf, 'ridge', 'timber');
+  if (Math.abs(emptyAsk - 1.3) > 1e-9) {
+    errors.push(`empty Ridge timber ask ${emptyAsk} ≠ 1.3`);
+  }
+  if (Math.abs(emptyAsk - 1) < 1e-9) errors.push('empty book must not quote 1:1');
+  tick(timberShelf, 25);
+  if (timberShelf.npcBooks.ridge.timber.sell + 1e-6 >= 20) {
+    errors.push(`25s restocked a full timber haul (${timberShelf.npcBooks.ridge.timber.sell})`);
+  }
+  if (timberShelf.npcBooks.ridge.timber.sell < 10) {
+    errors.push(`25s should restock some timber, got ${timberShelf.npcBooks.ridge.timber.sell}`);
+  }
+  tick(timberShelf, NPC_STOCK.restockSeconds - 25);
+  if (Math.abs(timberShelf.npcBooks.ridge.timber.sell - 20) > 1e-6) {
+    errors.push(`full restock window should refill timber, got ${timberShelf.npcBooks.ridge.timber.sell}`);
+  }
+
+  const dump = createInitialState();
+  dump.region = 'ridge';
+  dump.stashes.ridge.grain = 40;
+  const fullBid = quotedBuyPrice(dump, 'ridge', 'grain');
+  if (Math.abs(fullBid - 1.05) > 1e-9) {
+    errors.push(`full Ridge grain bid ${fullBid} ≠ 1.05`);
+  }
+  if (!sellToNpc(dump, 'grain', 40)) errors.push('full Ridge grain book should take 40');
+  if (dump.npcBooks.ridge.grain.buy > 1e-9) {
+    errors.push('Ridge grain book should empty after 40');
+  }
+  if (sellToNpc(dump, 'grain', 1)) errors.push('empty Ridge grain book should block');
+  const emptyBid = quotedBuyPrice(dump, 'ridge', 'grain');
+  if (Math.abs(emptyBid - 0.7) > 1e-9) {
+    errors.push(`empty Ridge grain bid ${emptyBid} ≠ 0.7`);
+  }
+  if (emptyBid >= 1 || emptyAsk <= 1) errors.push('empty quotes must stay a spread, not 1:1');
+
+  const thin = createInitialState();
+  thin.region = 'cross';
+  thin.coin = 40;
+  const fullCross = quotedSellPrice(thin, 'cross', 'timber');
+  if (Math.abs(fullCross - 1.15) > 1e-9) {
+    errors.push(`full Cross timber ask ${fullCross} ≠ 1.15`);
+  }
+  if (!buyFromNpc(thin, 'timber', 10)) errors.push('Cross timber buy of 10 failed');
+  const midCross = quotedSellPrice(thin, 'cross', 'timber');
+  const expectMid = 1.15 + (1.3 - 1.15) * 0.5;
+  if (Math.abs(midCross - expectMid) > 1e-9) {
+    errors.push(`thin Cross timber ask ${midCross} ≠ ${expectMid}`);
+  }
+  if (midCross <= 1.15 || midCross >= 1.3 || Math.abs(midCross - 1) < 1e-9) {
+    errors.push('foreign ask drift must stay inside 1.15–1.3 and never 1:1');
+  }
+  const coinBefore = thin.coin;
+  if (!buyFromNpc(thin, 'timber', 5)) errors.push('second Cross timber buy failed');
+  if (Math.abs(thin.coin - (coinBefore - npcTradeTotal(midCross, 5))) > 1e-9) {
+    errors.push('thin buy confirm must still be amount × unit');
+  }
+
+  const roadBook = createInitialState();
+  roadBook.region = 'ridge';
+  roadBook.coin = 40;
+  roadBook.stashes.ridge.ore = 10;
+  buyFromNpc(roadBook, 'timber', 20);
+  const left = depart(roadBook, {
+    to: 'vale',
+    cargo: { grain: 0, ore: 2, timber: 0, fibre: 0 },
+    feeGood: 'ore',
+  });
+  if (!left || !roadBook.travel) errors.push('depart after emptying timber failed');
+  tick(roadBook, 25);
+  const away = roadBook.npcBooks.ridge.timber.sell;
+  if (away + 1e-6 >= 20) errors.push('Vale↔Ridge time must not fully refill Ridge timber');
+  if (away < 10) errors.push(`books should restock while you travel, got ${away}`);
+
   if (vale.log[0] !== T0_LOG) errors.push('initial log must be the T0 one-liner');
   if (/1\.05|carry ~28|honesty/i.test(vale.log.join(' '))) {
     errors.push('initial log still dumps the old route recipe');
@@ -350,6 +455,9 @@ export function honestyReport(): string[] {
   }
   if (!/paid upgrade/i.test(notes)) {
     errors.push('Field notes cargo missing paid upgrades');
+  }
+  if (!/restock/i.test(notes)) {
+    errors.push('Field notes NPC missing restock');
   }
   if (/honesty|free travel/i.test(FIELD_NOTES_CRAFT) || /honesty|free travel/i.test(notes)) {
     errors.push('Field notes must not spoil honesty suite');
@@ -516,6 +624,30 @@ export function honestyReport(): string[] {
       errors.push('legacy save without cargoUpgrades should load 0 paid tiers');
     }
   }
+  const stockSave = createInitialState();
+  stockSave.region = 'ridge';
+  stockSave.npcBooks.ridge.timber.sell = 3;
+  stockSave.npcBooks.ridge.grain.buy = 7;
+  stockSave.tutorial.splash = false;
+  stockSave.tutorial.dismissed = true;
+  saveGame(stockSave);
+  const stockLoaded = loadGame();
+  if (!stockLoaded || Math.abs(stockLoaded.npcBooks.ridge.timber.sell - 3) > 1e-9) {
+    errors.push('persist lost NPC timber shelf');
+  }
+  if (!stockLoaded || Math.abs(stockLoaded.npcBooks.ridge.grain.buy - 7) > 1e-9) {
+    errors.push('persist lost NPC grain book');
+  }
+  const rawBooks = localStorage.getItem(SAVE_KEY);
+  if (rawBooks) {
+    const parsed = JSON.parse(rawBooks) as { npcBooks?: unknown };
+    delete parsed.npcBooks;
+    localStorage.setItem(SAVE_KEY, JSON.stringify(parsed));
+    const migratedBooks = loadGame();
+    if (!migratedBooks || migratedBooks.npcBooks.ridge.timber.sell !== 20) {
+      errors.push('legacy save without npcBooks should load full books');
+    }
+  }
   const raw = localStorage.getItem(SAVE_KEY);
   if (raw) {
     const parsed = JSON.parse(raw) as { timberBraceCrafted?: boolean };
@@ -532,6 +664,9 @@ export function honestyReport(): string[] {
   }
   if (reset.cargoUpgrades !== 0 || cargoCap(reset) !== 40) {
     errors.push('reset must clear paid cargo upgrades back to cap 40');
+  }
+  if (reset.npcBooks.ridge.timber.sell !== 20 || reset.npcBooks.vale.grain.buy !== 40) {
+    errors.push('reset must refill NPC books');
   }
   if (!reset.tutorial.splash || reset.tutorial.step !== 0 || reset.tutorial.dismissed) {
     errors.push('reset must restart splash + T0–T8');
@@ -550,4 +685,4 @@ if (errors.length) {
   console.error('Honesty failed:\n' + errors.map((e) => ` - ${e}`).join('\n'));
   throw new Error('honesty');
 }
-console.log('Honesty ok: Vale cannot harvest ore or timber; Workbench then Timber brace; cargo +5 only after brace; paid cart stacks on current cap; Ridge ore 1.3P; no transit idle; no arrival full-tick credit.');
+console.log('Honesty ok: Vale cannot harvest ore or timber; Workbench then Timber brace; cargo +5 only after brace; paid cart stacks on current cap; Ridge timber shelf ≤20 empties in one haul; restock slower than Vale↔Ridge; empty book is not 1:1; Ridge ore 1.3P; no transit idle; no arrival full-tick credit.');

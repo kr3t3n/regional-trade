@@ -101,6 +101,20 @@ export const NPC = {
   foreignSellMult: 1.15,
 } as const;
 
+/**
+ * NPC book depth (#12). One haul can empty a side.
+ * Timber ≤ one Timber brace buy so Ridge/Cross shelf dies in one trip.
+ * General goods ≤ one cargo. Restock slower than Vale↔Ridge (25s) so
+ * waiting a return-road does not refill a haul. Quotes drift inside
+ * the existing local 0.7/1.3 and foreign 1.05/1.15 envelope — empty
+ * blocks, never Travian 1:1, never a global board.
+ */
+export const NPC_STOCK = {
+  generalMax: 40,
+  timberMax: 20,
+  restockSeconds: 40,
+} as const;
+
 /** Client tick rate */
 export const TICK_HZ = 10;
 
@@ -167,7 +181,7 @@ export function travelSeconds(from: RegionId, to: RegionId): number {
   return TRAVEL_SECONDS[travelKey(from, to)] ?? 25;
 }
 
-/** NPC buy price (what NPC pays YOU when you sell to them) */
+/** NPC buy price (what NPC pays YOU when you sell to them) — full-book base. */
 export function npcBuyPrice(regionId: RegionId, good: Good): number {
   const region = REGIONS[regionId];
   const P = NPC.fairPrice;
@@ -175,12 +189,47 @@ export function npcBuyPrice(regionId: RegionId, good: Good): number {
   return P * NPC.foreignBuyMult;
 }
 
-/** NPC sell price (what YOU pay to buy FROM NPC) */
+/** NPC sell price (what YOU pay to buy FROM NPC) — full-book base. */
 export function npcSellPrice(regionId: RegionId, good: Good): number {
   const region = REGIONS[regionId];
   const P = NPC.fairPrice;
   if (region.local.includes(good)) return P * NPC.localSellMult;
   return P * NPC.foreignSellMult;
+}
+
+/** Max NPC buy or sell volume for this region×good. Timber ≤ brace haul. */
+export function npcStockCap(_regionId: RegionId, good: Good): number {
+  if (good === 'timber') return NPC_STOCK.timberMax;
+  return NPC_STOCK.generalMax;
+}
+
+function clampFill(fill: number): number {
+  if (!Number.isFinite(fill)) return 0;
+  return Math.max(0, Math.min(1, fill));
+}
+
+/**
+ * Quoted NPC bid as the book thins. Full (fill=1) = base spread.
+ * Empty (fill=0) = local-buy 0.7P. Foreign 1.05 drifts toward 0.7.
+ * Never 1:1.
+ */
+export function npcQuotedBuyPrice(regionId: RegionId, good: Good, fill: number): number {
+  const base = npcBuyPrice(regionId, good);
+  const thin = NPC.fairPrice * NPC.localBuyMult;
+  const t = clampFill(fill);
+  return base + (thin - base) * (1 - t);
+}
+
+/**
+ * Quoted NPC ask as the shelf thins. Full (fill=1) = base spread.
+ * Empty (fill=0) = local-sell 1.3P. Foreign 1.15 drifts toward 1.3.
+ * Never 1:1.
+ */
+export function npcQuotedSellPrice(regionId: RegionId, good: Good, fill: number): number {
+  const base = npcSellPrice(regionId, good);
+  const thin = NPC.fairPrice * NPC.localSellMult;
+  const t = clampFill(fill);
+  return base + (thin - base) * (1 - t);
 }
 
 /**
