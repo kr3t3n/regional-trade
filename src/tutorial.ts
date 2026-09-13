@@ -1,4 +1,4 @@
-import { TRAVEL, WORKBENCH_COST } from './config';
+import { TRAVEL, WORKBENCH_COST, npcBuyPrice, npcSellPrice } from './config';
 import type { GameState } from './game';
 
 export type TutorialStep = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
@@ -101,6 +101,15 @@ export function dismissTutorial(state: GameState): void {
   state.tutorial.dismissed = true;
 }
 
+/** 20 home + fee + grain cargo that still buys 22 Ridge ore. */
+function firstHaulNeedGrain(): number {
+  const leave = WORKBENCH_COST.grain ?? 20;
+  const fee = TRAVEL.feeAmount;
+  const oreNeed = (WORKBENCH_COST.ore ?? 20) + fee;
+  const cargo = Math.ceil((oreNeed * npcSellPrice('ridge', 'ore')) / npcBuyPrice('ridge', 'grain') - 1e-9);
+  return leave + fee + cargo;
+}
+
 export function inferTutorialStep(state: GameState): TutorialStep {
   if (state.workbenchCrafted) return 8;
 
@@ -108,8 +117,6 @@ export function inferTutorialStep(state: GameState): TutorialStep {
   const here = state.region ? state.stashes[state.region] : null;
   const cargoOre = state.travel?.cargo.ore ?? 0;
   const craftOre = WORKBENCH_COST.ore ?? 20;
-  const craftGrain = WORKBENCH_COST.grain ?? 20;
-  const fee = TRAVEL.feeAmount;
   const oreHere = here ? here.ore : 0;
 
   if (state.region === 'vale' && !state.travel && vale.ore + 1e-9 >= craftOre) return 7;
@@ -126,7 +133,7 @@ export function inferTutorialStep(state: GameState): TutorialStep {
   if (state.travel) return 4;
   if (state.region === 'cross') return 3;
 
-  if (vale.grain + 1e-9 >= craftGrain + fee) return 3;
+  if (vale.grain + 1e-9 >= firstHaulNeedGrain()) return 3;
   if (vale.grain + 1e-9 >= 5) return 2;
   if (state.tutorial.harvested || vale.grain + 1e-9 >= 1) return 1;
   return 0;
