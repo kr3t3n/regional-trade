@@ -19,23 +19,26 @@ export const GOOD_LABEL: Record<Good, string> = {
 
 export const REGIONS: Record<
   RegionId,
-  { id: RegionId; name: string; local: Good[]; foreign: Good[] }
+  { id: RegionId; name: string; place: string; local: Good[]; foreign: Good[] }
 > = {
   vale: {
     id: 'vale',
     name: 'Vale',
+    place: 'Vale Fields',
     local: ['grain', 'fibre'],
     foreign: ['ore', 'timber'],
   },
   ridge: {
     id: 'ridge',
     name: 'Ridge',
+    place: 'Ridge Heights',
     local: ['ore', 'timber'],
     foreign: ['grain', 'fibre'],
   },
   cross: {
     id: 'cross',
     name: 'Cross',
+    place: 'Cross Way',
     local: ['grain', 'ore'],
     foreign: ['timber', 'fibre'],
   },

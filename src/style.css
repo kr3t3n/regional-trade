@@ -846,6 +846,95 @@ select {
   font-weight: 700;
 }
 
+.splash {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+  background: rgba(12, 9, 6, 0.72);
+}
+
+.splash-card {
+  width: min(28rem, 100%);
+  padding: 1.6rem 1.5rem 1.35rem;
+  text-align: center;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+}
+
+.splash-card h1 {
+  margin: 0.15rem 0 0.55rem;
+  font-family: var(--font-display);
+  font-size: 2rem;
+  font-weight: 700;
+}
+
+.splash-line {
+  margin: 0 0 1.1rem;
+  font-size: 1.02rem;
+  color: #3d382c;
+}
+
+.splash-card button {
+  min-width: 10rem;
+}
+
+.splash-mute {
+  margin: 0.85rem 0 0;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.coach {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.85rem;
+  margin-bottom: 0.7rem;
+  padding: 0.7rem 0.85rem 0.8rem;
+  background: #2a241c;
+  color: #f6eedc;
+  border: 1px solid #4a4032;
+  border-left: 4px solid var(--gold);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+}
+
+.coach .lbl {
+  color: #cbbfa3;
+}
+
+.coach-kicker {
+  margin: 0.1rem 0 0.25rem;
+  font-family: var(--font-display);
+  font-size: 1.12rem;
+  font-weight: 700;
+}
+
+.coach-body {
+  margin: 0;
+  font-size: 0.92rem;
+  color: #e7d9b4;
+}
+
+.coach-body strong,
+.coach-body em {
+  font-style: normal;
+  color: #f7efd8;
+}
+
+.coach button.ghost {
+  flex-shrink: 0;
+}
+
+.coach-target {
+  box-shadow: var(--shadow), 0 0 0 2px var(--gold);
+}
+
 @media (max-width: 860px) {
   .status-bar,
   .stashes,
@@ -854,6 +943,10 @@ select {
   }
 
   .top {
+    flex-direction: column;
+  }
+
+  .coach {
     flex-direction: column;
   }
 }

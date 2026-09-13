@@ -5,23 +5,22 @@ import {
   NEXT_RECIPE_NEEDS,
   NPC,
   TRAVEL,
-  WORKBENCH_UNLOCK_CARGO,
 } from './config';
 
 /**
- * First visit (no stored pref) opens the helper, then stores off so later
- * visits stay closed unless the player toggles it on.
+ * Missing pref stores off and stays closed. The first-trip walk owns
+ * onboarding. Field notes never auto-reopen after that write.
  */
 export function loadHelpOpen(): boolean {
-  if (typeof localStorage === 'undefined') return true;
+  if (typeof localStorage === 'undefined') return false;
   try {
     const raw = localStorage.getItem(HELP_KEY);
     if (raw === 'off') return false;
     if (raw === 'on') return true;
     saveHelpOpen(false);
-    return true;
+    return false;
   } catch {
-    return true;
+    return false;
   }
 }
 
@@ -45,35 +44,35 @@ export function helperMarkup(): string {
         </div>
         <button type="button" class="ghost" data-act="help">Close</button>
       </div>
-      <p class="helper-note">Short facts, not a first-trip walkthrough. Toggle anytime.</p>
+      <p class="helper-note">Short facts — not the first-trip walk. Toggle anytime.</p>
       <dl>
         <div>
           <dt>Harvest</dt>
-          <dd>Click +${HARVEST.clickAmount} of a <em>local</em> good while you stand there. Idle +${HARVEST.idlePerSecond}/s × node in-region only — pauses in transit. Energy ${HARVEST.energyCap}, regen 1 / ${HARVEST.energyRegenSeconds}s.</dd>
+          <dd>Click +${HARVEST.clickAmount} local while you stand there. Idle +${HARVEST.idlePerSecond}/s × node in-region only — quiet on the road. Energy ${HARVEST.energyCap}, regen 1 / ${HARVEST.energyRegenSeconds}s.</dd>
         </div>
         <div>
           <dt>Travel</dt>
-          <dd>Fee ${TRAVEL.feeAmount} of a local good. You are not in a region while moving. Vale↔Ridge 25s; via Cross 20s + 20s. Cancel loses the fee; cargo returns. No teleport.</dd>
+          <dd>Fee ${TRAVEL.feeAmount} local. Nowhere while moving. Vale↔Ridge 25s; via Cross 20s+20s. Cancel burns fee; cargo comes home. No teleport.</dd>
         </div>
         <div>
           <dt>Cargo</dt>
-          <dd>Cap ${TRAVEL.cargoCap} (any mix). Goods leave the stash on depart and land at the destination. Leave 20 grain in Vale if Workbench is still open.</dd>
+          <dd>Cap ${TRAVEL.cargoCap}. Leave 20 grain in Vale if Workbench still open.</dd>
         </div>
         <div>
           <dt>NPC spreads</dt>
-          <dd>Coin only — totals are amount × unit price. Local buy ${NPC.localBuyMult}P / sell ${NPC.localSellMult}P. Foreign buy ${NPC.foreignBuyMult}P / sell ${NPC.foreignSellMult}P. P=${NPC.fairPrice}. Ridge ore sells at 1.3. No 1:1 swap. No global price board.</dd>
+          <dd>Coin only; amount × unit. Local buy ${NPC.localBuyMult}P / sell ${NPC.localSellMult}P. Foreign buy ${NPC.foreignBuyMult}P / sell ${NPC.foreignSellMult}P. Ridge ore 1.3. No 1:1. No global board.</dd>
         </div>
         <div>
           <dt>Coin</dt>
-          <dd>Only from NPC sales. Not harvestable. Spend it to buy the missing good.</dd>
+          <dd>Only from NPC sales.</dd>
         </div>
         <div>
           <dt>Craft gates</dt>
-          <dd>Workbench: 20 grain + 20 ore in <em>this</em> stash. Vale cannot harvest ore. After that, the next recipe still spends ${GOOD_LABEL[NEXT_RECIPE_NEEDS]} (foreign in Vale) plus cargo +${WORKBENCH_UNLOCK_CARGO} or local craft speed — promised, not shipped.</dd>
+          <dd>Workbench 20 grain + 20 ore in <em>this</em> stash. Next recipe still ${GOOD_LABEL[NEXT_RECIPE_NEEDS].toLowerCase()} foreign in Vale.</dd>
         </div>
         <div>
           <dt>Maps / boards</dt>
-          <dd>Three region stashes are the map. You are the only one here. No player books.</dd>
+          <dd>Three region stashes are the map. You are the only one here.</dd>
         </div>
       </dl>
     </aside>`;

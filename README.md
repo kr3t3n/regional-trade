@@ -33,7 +33,9 @@ Override either host with `VITE_BASE=/your/path/ npm run build`, or set `GITHUB_
 
 Progress (stash per region, nodes, coin, energy, region, in-transit cargo, Workbench) is saved to **localStorage** (`regional-trade-v1`). There is a **Reset save** button. Offline catch-up is **off**: closing the tab does not grant idle, energy, or travel credit.
 
-**Help** is a toggleable field-notes panel (harvest, travel, cargo, NPC spreads, coin, craft gates). It is distinct from the first Ridge trip tip. First visit opens it; after that it stays off unless you turn it back on (`regional-trade-helper`). Reset save does not clear that preference.
+**Help** is toggleable Field notes (concepts, not the first-trip walk). First visit stays closed and stores `regional-trade-helper=off`; it never auto-reopens after that. Reset save does not clear that preference.
+
+A dismissible **first-trip walk** (splash + T0–T8 coach) takes a new player from Vale to a Ridge haul and the Workbench without the README. **Got it** dismisses the coach. Reset save restarts T0–T8. Copy lives in `docs/NARRATIVE-PACK-v1.md`.
 
 ## Deploy `dist/` as static files
 
@@ -80,8 +82,10 @@ Honesty: cannot craft without leaving Vale (ore is foreign there); idle pauses i
 | `src/game.ts` | State + tick + actions |
 | `src/persist.ts` | localStorage save/load/reset (no offline catch-up) |
 | `src/main.ts` | One-screen UI (NPC totals = amount × unit, live) |
-| `src/help.ts` | Toggleable field-notes helper + localStorage pref |
+| `src/help.ts` | Toggleable Field notes + localStorage pref |
+| `src/tutorial.ts` | Splash + T0–T8 first-trip coach |
 | `src/icons.ts` | SVG tiles for goods / regions / panels |
+| `docs/NARRATIVE-PACK-v1.md` | Voice, splash, T0–T8, Field notes |
 | `vite.config.ts` | Dual `base`: `/games/trade/` or `/regional-trade/` |
 | `PLAN.md` | Later path to multiplayer + AI regional agents — not in this build |
 

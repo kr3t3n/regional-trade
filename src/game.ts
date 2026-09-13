@@ -18,6 +18,7 @@ import {
   npcSellPrice,
   npcTradeTotal,
 } from './config';
+import { T0_LOG, createTutorialState, type TutorialState } from './tutorial';
 
 export type Inventory = Record<Good, number>;
 
@@ -46,6 +47,7 @@ export interface GameState {
   travel: TravelState | null;
   workbenchCrafted: boolean;
   log: string[];
+  tutorial: TutorialState;
 }
 
 export function emptyInv(): Inventory {
@@ -80,9 +82,8 @@ export function createInitialState(): GameState {
     nodes,
     travel: null,
     workbenchCrafted: false,
-    log: [
-      'Spawn Vale. Leave 20 grain home. Fee 2 + carry ~28 grain → Ridge (25s), or hop Vale → Cross → Ridge (20s each). Sell grain (1.05), buy Ridge ore (local sell 1.3), return, craft.',
-    ],
+    log: [T0_LOG],
+    tutorial: createTutorialState(),
   };
 }
 
@@ -180,7 +181,9 @@ function arrive(state: GameState) {
   }
   state.region = to;
   state.travel = null;
-  pushLog(state, `Arrived in ${REGIONS[to].name}.`);
+  if (to === 'ridge') pushLog(state, 'Ridge. Market open.');
+  else if (to === 'vale') pushLog(state, 'Vale. Stash waiting.');
+  else pushLog(state, 'Cross. Waypoint.');
 }
 
 export function tick(state: GameState, dt: number) {
@@ -259,7 +262,7 @@ export function depart(state: GameState, opts: DepartOptions): boolean {
   state.region = null;
   pushLog(
     state,
-    `Departing ${REGIONS[from].name} → ${REGIONS[opts.to].name} (${state.travel.duration}s). Fee: ${fee} ${opts.feeGood}.`
+    `Left ${REGIONS[from].name} for ${REGIONS[opts.to].name} — ${state.travel.duration}s, fee paid.`
   );
   return true;
 }
@@ -275,7 +278,7 @@ export function cancelTravel(state: GameState): boolean {
   // fee already spent — lost
   state.region = t.from;
   state.travel = null;
-  pushLog(state, `Cancelled travel. Fee lost. Cargo returned to ${REGIONS[t.from].name}.`);
+  pushLog(state, `Turned back. Fee burned. Cargo returned to ${REGIONS[t.from].name}.`);
   return true;
 }
 
@@ -289,7 +292,7 @@ export function sellToNpc(state: GameState, good: Good, amount: number): boolean
   const credit = npcTradeTotal(price, amount);
   stash[good] -= amount;
   state.coin += credit;
-  pushLog(state, `Sold ${amount} ${good} @ ${price.toFixed(2)} → +${credit.toFixed(2)} coin.`);
+  pushLog(state, `Sold ${amount} ${good}.`);
   return true;
 }
 
@@ -306,7 +309,7 @@ export function buyFromNpc(state: GameState, good: Good, amount: number): boolea
   const stash = state.stashes[state.region];
   state.coin -= cost;
   stash[good] += amount;
-  pushLog(state, `Bought ${amount} ${good} @ ${price.toFixed(2)} → −${cost.toFixed(2)} coin.`);
+  pushLog(state, `Bought ${amount} ${good}.`);
   return true;
 }
 
@@ -336,10 +339,7 @@ export function craftWorkbench(state: GameState): boolean {
     stash[g] -= need;
   }
   state.workbenchCrafted = true;
-  pushLog(
-    state,
-    `Crafted Workbench. Next recipe board unlocks (still needs ${GOOD_LABEL[NEXT_RECIPE_NEEDS]}) plus cargo +${WORKBENCH_UNLOCK_CARGO} or local craft speed.`
-  );
+  pushLog(state, `Workbench stands in ${REGIONS[state.region!].name}.`);
   return true;
 }
 

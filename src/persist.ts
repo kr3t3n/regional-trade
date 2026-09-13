@@ -20,6 +20,11 @@ import {
   type Inventory,
   type TravelState,
 } from './game';
+import {
+  parseTutorial,
+  tutorialFromLegacySave,
+  type TutorialState,
+} from './tutorial';
 
 export const SAVE_VERSION = 1;
 
@@ -35,6 +40,7 @@ interface SaveV1 {
   travel: TravelState | null;
   workbenchCrafted: boolean;
   log: string[];
+  tutorial?: TutorialState;
 }
 
 function isGood(v: unknown): v is Good {
@@ -124,6 +130,7 @@ export function saveGame(state: GameState): void {
       : null,
     workbenchCrafted: state.workbenchCrafted,
     log: state.log.slice(0, 8),
+    tutorial: { ...state.tutorial },
   };
   try {
     localStorage.setItem(SAVE_KEY, JSON.stringify(payload));
@@ -195,6 +202,22 @@ export function loadGame(): GameState | null {
       ? data.log.filter((l): l is string => typeof l === 'string').slice(0, 8)
       : [];
 
+    const hasProgress =
+      data.workbenchCrafted ||
+      !!travel ||
+      data.coin > 0 ||
+      energy < HARVEST.energyCap ||
+      REGION_IDS.some((id) => GOODS.some((g) => stashes[id][g] > 0.05)) ||
+      REGION_IDS.some((id) =>
+        Object.values(nodes[id]).some((n) => typeof n === 'number' && n > 1)
+      );
+
+    const tutorialFallback = tutorialFromLegacySave({
+      workbenchCrafted: data.workbenchCrafted,
+      hasProgress,
+    });
+    const tutorial = parseTutorial(data.tutorial, tutorialFallback);
+
     const fresh = createInitialState();
     return {
       ...fresh,
@@ -207,6 +230,7 @@ export function loadGame(): GameState | null {
       travel,
       workbenchCrafted: data.workbenchCrafted,
       log: log.length ? log : fresh.log,
+      tutorial,
     };
   } catch {
     return null;
