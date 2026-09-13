@@ -27,6 +27,11 @@
   box-sizing: border-box;
 }
 
+html,
+body {
+  overflow-x: hidden;
+}
+
 body {
   margin: 0;
   min-height: 100vh;
@@ -1061,7 +1066,8 @@ select {
 }
 
 .traveler.walk {
-  left: 44%;
+  left: calc(10% + (var(--road, 0) * 64%));
+  transition: left 0.2s linear;
   animation: traveler-bob 1.15s ease-in-out infinite;
 }
 
@@ -1186,16 +1192,155 @@ select {
   text-anchor: middle;
 }
 
-.place .goal,
-.place .complete-chip {
-  position: relative;
-  z-index: 1;
-  margin: 0.45rem 0.75rem 0;
-  padding: 0.45rem 0.7rem;
+.place-goal {
+  position: absolute;
+  left: 0.7rem;
+  bottom: 0.7rem;
+  z-index: 2;
+  max-width: min(22rem, calc(100% - 14rem));
+}
+
+.place-goal .goal,
+.place-goal .complete-chip {
+  margin: 0;
+  padding: 0.4rem 0.6rem;
   background: rgba(246, 238, 220, 0.94);
   color: var(--ink);
   border-radius: 10px;
   border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+}
+
+.place .coach {
+  margin: 0.55rem 0.75rem 0;
+}
+
+.verb-bar {
+  display: flex;
+  gap: 0.45rem;
+  align-items: stretch;
+  padding: 0.65rem 0.75rem 0.8rem;
+}
+
+.verb {
+  flex: 1 1 auto;
+  min-height: 3.1rem;
+  padding: 0.7rem 1rem;
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 700;
+  background: #2d6a3c;
+  border-color: #245833;
+}
+
+.verb:hover:not(:disabled) {
+  background: #357a46;
+}
+
+.verb.spot {
+  box-shadow: 0 0 0 3px var(--gold), 0 10px 22px rgba(12, 8, 4, 0.35);
+  animation: verb-spot 1.35s ease-in-out infinite;
+}
+
+@keyframes verb-spot {
+  50% {
+    box-shadow: 0 0 0 6px rgba(196, 163, 90, 0.35), 0 10px 22px rgba(12, 8, 4, 0.35);
+  }
+}
+
+.verb-alt {
+  flex: 0 0 auto;
+  min-height: 3.1rem;
+  background: #fffaf0;
+  color: var(--ink);
+  border-color: #c8bda0;
+}
+
+.verb-alt:hover:not(:disabled) {
+  background: #f3ead3;
+}
+
+.haul-cheer {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  font-family: var(--font-display);
+  font-size: 2rem;
+  font-weight: 700;
+  color: #f7efd8;
+  text-shadow: 0 2px 12px rgba(12, 8, 4, 0.55);
+  background: radial-gradient(circle at 50% 55%, rgba(20, 16, 8, 0.28), transparent 62%);
+}
+
+.haul-cheer.on {
+  animation: cheer-pop 1.6s ease forwards;
+}
+
+@keyframes cheer-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.86);
+  }
+  18% {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.02);
+  }
+}
+
+.road-hud {
+  position: absolute;
+  left: 0.7rem;
+  right: 0.7rem;
+  bottom: 0.7rem;
+  z-index: 3;
+  padding: 0.55rem 0.7rem 0.65rem;
+  background: rgba(22, 19, 15, 0.78);
+  border: 1px solid rgba(246, 238, 220, 0.18);
+  border-radius: 12px;
+}
+
+.road-hud .meta {
+  color: #e7d9b4;
+}
+
+.road-note {
+  margin: 0.25rem 0 0.45rem;
+  font-size: 0.82rem;
+  color: #cbbfa3;
+}
+
+.road-hud .sec {
+  width: auto;
+  margin-top: 0;
+}
+
+.log-fold summary {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: var(--font-display);
+  font-size: 1.12rem;
+  font-weight: 600;
+}
+
+.log-fold ul {
+  margin-top: 0.45rem;
+}
+
+body.haul-on .place-harvest-wall {
+  display: none;
 }
 
 .place .harvest {
@@ -1342,18 +1487,180 @@ select {
   }
 
   .coach {
-    flex-direction: column;
-  }
-
-  .region-map {
-    position: relative;
-    top: auto;
-    right: auto;
-    width: calc(100% - 1.5rem);
-    margin: 0.35rem 0.75rem 0;
+    flex-direction: row;
+    align-items: center;
   }
 
   .place-copy {
     max-width: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .wrap {
+    padding: 0 0 1.1rem;
+  }
+
+  .top {
+    position: relative;
+    z-index: 3;
+    margin: 0;
+    padding: 0.55rem 0.7rem 0.2rem;
+  }
+
+  .top h1 {
+    font-size: 1.2rem;
+  }
+
+  .sub,
+  .region-rail,
+  .desk-hint,
+  .place-voice,
+  .goal-why,
+  .coach-kicker,
+  .coach .lbl,
+  .region-map figcaption {
+    display: none;
+  }
+
+  .place {
+    margin: 0;
+    border-radius: 0;
+    border-left: 0;
+    border-right: 0;
+    min-height: calc(100dvh - 4.6rem);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .place-stage {
+    flex: 1 1 auto;
+    min-height: 62dvh;
+  }
+
+  .place-copy {
+    padding: 0.55rem 0.75rem 0.2rem;
+    max-width: 70%;
+  }
+
+  .place-title {
+    font-size: 1.45rem;
+  }
+
+  .place-mood {
+    font-size: 0.92rem;
+  }
+
+  .region-map {
+    position: absolute;
+    top: 0.45rem;
+    right: 0.45rem;
+    width: 6.6rem;
+    padding: 0.2rem 0.22rem 0.12rem;
+    margin: 0;
+  }
+
+  .place-goal {
+    left: auto;
+    right: 0.45rem;
+    top: 7.05rem;
+    bottom: auto;
+    max-width: 6.6rem;
+  }
+
+  .place-goal .lbl {
+    display: none;
+  }
+
+  .place-goal .goal,
+  .place-goal .complete-chip {
+    padding: 0.28rem 0.45rem;
+  }
+
+  .place .coach {
+    margin: 0;
+    padding: 0.45rem 0.7rem;
+    border-radius: 0;
+    border-left: 0;
+    border-right: 0;
+  }
+
+  .coach-body {
+    font-size: 0.95rem;
+  }
+
+  .verb-bar {
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+    margin: 0;
+    padding: 0.55rem 0.7rem calc(0.65rem + env(safe-area-inset-bottom));
+    background: rgba(22, 19, 15, 0.88);
+  }
+
+  .verb {
+    min-height: 3.35rem;
+    font-size: 1.2rem;
+  }
+
+  .desk-bar {
+    margin: 0.45rem 0.7rem 0.35rem;
+  }
+
+  .desk-btn {
+    flex: 1 1 0;
+    min-height: 2.6rem;
+  }
+
+  .place-harvest-wall {
+    display: none;
+  }
+
+  .place:has(.road-hud) .coach {
+    display: none;
+  }
+
+  .log-fold {
+    margin: 0.55rem 0.7rem 1rem;
+  }
+
+  .haul-cheer {
+    font-size: 1.65rem;
+    padding: 0 0.8rem;
+    text-align: center;
+  }
+
+  .npc {
+    overflow-x: hidden;
+  }
+
+  .npc table {
+    display: block;
+  }
+
+  .npc thead {
+    display: none;
+  }
+
+  .npc tbody,
+  .npc tr,
+  .npc td {
+    display: block;
+    width: 100%;
+  }
+
+  .npc tr {
+    padding: 0.45rem 0;
+    border-bottom: 1px solid #eee4d2;
+  }
+
+  .npc td.acts {
+    white-space: normal;
+    display: flex;
+    gap: 0.35rem;
+  }
+
+  .npc .acts button {
+    flex: 1 1 0;
   }
 }

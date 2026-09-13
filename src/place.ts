@@ -281,11 +281,17 @@ export function placeSceneMarkup(
     goalHtml: string;
     harvestHtml: string;
     coachVale: boolean;
+    verbHtml?: string;
+    beatHtml?: string;
+    cheerHtml?: string;
+    travelHudHtml?: string;
+    road?: number;
   }
 ): string {
   const kind = placeKind(state);
   const hereId = state.region && !state.travel ? state.region : '';
   const here = !!hereId;
+  const road = opts.road ?? 0;
   return `
     <section class="place ${kind}${hereId ? ` ${hereId}` : ''}${
       opts.coachVale ? ' coach-target' : ''
@@ -293,7 +299,7 @@ export function placeSceneMarkup(
       <div class="place-stage">
         <div class="place-art" aria-hidden="true">
           ${sceneArt(kind)}
-          <div class="traveler ${state.travel ? 'walk' : 'stand'}">${travelerSvg()}</div>
+          <div class="traveler ${state.travel ? 'walk' : 'stand'}" id="ui-traveler" style="--road:${road}">${travelerSvg()}</div>
         </div>
         <div class="place-copy">
           <p class="lbl">${state.travel ? 'In transit' : 'You stand in'}</p>
@@ -303,9 +309,13 @@ export function placeSceneMarkup(
           ${opts.energyHtml}
         </div>
         ${regionMapMarkup(state, opts.desk)}
+        <div class="place-goal">${opts.goalHtml}</div>
+        ${opts.cheerHtml ?? ''}
+        ${opts.travelHudHtml ?? ''}
       </div>
-      ${opts.goalHtml}
-      ${here ? opts.harvestHtml : ''}
+      ${opts.beatHtml ?? ''}
+      ${opts.verbHtml ?? ''}
+      ${here ? `<div class="place-harvest-wall">${opts.harvestHtml}</div>` : ''}
     </section>`;
 }
 

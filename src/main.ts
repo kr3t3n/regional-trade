@@ -55,13 +55,27 @@ import {
 import { MISSION } from './mission';
 import {
   deskBarMarkup,
-  deskForTarget,
   placeEnergyLine,
   placeSceneMarkup,
   showTimberFork,
   timberForkMarkup,
   type DeskId,
 } from './place';
+import {
+  HAUL_CHEER,
+  altHarvestGood,
+  arriveCheer,
+  cheerMarkup,
+  nextVerb,
+  ridgeHaulPlan,
+  ridgeBuyOreAmount,
+  ridgeSellAmount,
+  roadHudMarkup,
+  roadProgress,
+  valeReturnPlan,
+  verbMarkup,
+  type CheerKind,
+} from './haul';
 
 let state: GameState = loadGame() ?? createInitialState();
 const cargoPick: Inventory = { grain: 0, ore: 0, timber: 0, fibre: 0 };
@@ -70,10 +84,12 @@ let upgradeGood: Good = 'grain';
 let tradeAmount = 1;
 let destPick: RegionId = 'ridge';
 let desk: DeskId = 'none';
-let lastForcedStep = -1;
 let helpOpen = loadHelpOpen();
 let dirty = true;
 let persistAcc = 0;
+let cheer: CheerKind | null = null;
+let cheerLine: string | null = null;
+let cheerTimer = 0;
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
 mountHelper();
@@ -105,12 +121,15 @@ function paintPlaceChrome() {
   else if (state.region) document.body.classList.add(`place-${state.region}`);
 }
 
-function maybeForceDesk() {
-  const forced = deskForTarget(coachTarget(state));
-  if (forced && state.tutorial.step !== lastForcedStep) {
-    desk = forced;
-    lastForcedStep = state.tutorial.step;
-  }
+function celebrate(kind: CheerKind, line?: string) {
+  cheer = kind;
+  cheerLine = line ?? (kind === 'arrive' ? arriveCheer(state) : HAUL_CHEER[kind]);
+  window.clearTimeout(cheerTimer);
+  cheerTimer = window.setTimeout(() => {
+    cheer = null;
+    cheerLine = null;
+    dirty = true;
+  }, 1650);
 }
 
 function readForm() {
@@ -481,17 +500,17 @@ function render() {
     destPick = REGION_IDS.find((id) => id !== region.id) ?? 'ridge';
   }
 
-  maybeForceDesk();
-
   const energyPct = Math.min(100, (state.energy / HARVEST.energyCap) * 100);
   const travelPct = state.travel
     ? Math.min(100, (state.travel.elapsed / state.travel.duration) * 100)
     : 0;
 
   const mark = coachTarget(state);
+  const haulOn = !state.tutorial.dismissed && !state.workbenchCrafted;
+  document.body.classList.toggle('haul-on', haulOn);
 
   app.innerHTML = `
-    <div class="wrap">
+    <div class="wrap${desk === 'none' ? ' drawers-shut' : ''}">
       <header class="top">
         <div>
           <h1>Regional trade</h1>
@@ -511,30 +530,16 @@ function render() {
         desk,
         energyHtml: placeEnergyLine(state.energy, HARVEST.energyCap, energyPct),
         goalHtml: goalBlock(),
-        harvestHtml: inRegion && region && stash ? harvestScene(region, stash, mark) : '',
+        harvestHtml: inRegion && region && stash && !haulOn ? harvestScene(region, stash, mark) : '',
         coachVale: mark === 'vale',
+        verbHtml: state.tutorial.splash ? '' : verbMarkup(state),
+        beatHtml: coachMarkup(state),
+        cheerHtml: cheerMarkup(cheer, cheerLine),
+        travelHudHtml: roadHudMarkup(state, travelPct, regionLabel()),
+        road: roadProgress(state),
       })}
 
-      ${coachMarkup(state)}
-
-      ${
-        state.travel
-          ? `
-        <section class="panel travel-live${mark === 'travel-live' ? ' coach-target' : ''}">
-          <h2>${panelMark('travel')} Travel</h2>
-          <p class="paused">Idle waits at home</p>
-          <p>On the road: no harvest. Cargo rides with you.</p>
-          <p class="cargo-line">Cargo ${fmt(GOODS.reduce((s, g) => s + state.travel!.cargo[g], 0))} / ${cargoCap(state)}
-            ${GOODS.filter((g) => state.travel!.cargo[g] > 0)
-              .map((g) => `${goodChip(g)} ${fmt(state.travel!.cargo[g])}`)
-              .join(' ')}
-          </p>
-          <div class="bar"><div class="fill" id="ui-bar" style="width:${travelPct}%"></div></div>
-          <p class="meta" id="ui-region">${regionLabel()}</p>
-          <button type="button" class="sec" data-act="cancel">Cancel (burns fee, cargo comes home to ${REGIONS[state.travel.from].name})</button>
-        </section>`
-          : `<p class="visually-hidden" id="ui-region">${regionLabel()}</p>`
-      }
+      ${state.travel ? '' : `<p class="visually-hidden" id="ui-region">${regionLabel()}</p>`}
 
       ${deskBarMarkup(desk, !!state.travel)}
 
@@ -542,10 +547,10 @@ function render() {
       ${inRegion && region && desk === 'travel' ? travelDrawer(region, mark) : ''}
       ${inRegion && desk === 'craft' ? `<div class="desk-panel">${craftPanel()}</div>` : ''}
 
-      <section class="panel log">
-        <h2>${panelMark('log')} Log</h2>
+      <details class="panel log log-fold">
+        <summary>${panelMark('log')} Log</summary>
         <ul id="ui-log">${state.log.map((l) => `<li>${l}</li>`).join('')}</ul>
-      </section>
+      </details>
       ${state.tutorial.splash ? splashMarkup() : ''}
     </div>
   `;
@@ -575,6 +580,24 @@ function paintLive() {
     }
   }
   paintPlaceChrome();
+  const traveler = document.getElementById('ui-traveler');
+  if (traveler) traveler.style.setProperty('--road', String(roadProgress(state)));
+  const verbNow = nextVerb(state);
+  const verbBar = app.querySelector('[data-verb]');
+  if (verbBar && verbBar.getAttribute('data-verb') !== verbNow.id) {
+    dirty = true;
+  } else {
+    const verbBtn = app.querySelector<HTMLButtonElement>('.verb');
+    if (verbBtn) {
+      verbBtn.textContent = verbNow.label;
+      verbBtn.disabled = !verbNow.ready;
+    }
+    const alt = altHarvestGood(state);
+    const altBtn = app.querySelector<HTMLButtonElement>('.verb-alt');
+    if (altBtn && alt) {
+      altBtn.disabled = !canHarvest(state, alt);
+    }
+  }
   if (state.travel) {
     const bar = document.getElementById('ui-bar');
     if (bar) {
@@ -740,7 +763,9 @@ document.addEventListener('click', (e) => {
     feeGood = 'grain';
     upgradeGood = 'grain';
     desk = 'none';
-    lastForcedStep = -1;
+    cheer = null;
+    cheerLine = null;
+    window.clearTimeout(cheerTimer);
     dirty = true;
     render();
     return;
@@ -757,21 +782,68 @@ document.addEventListener('click', (e) => {
   if (act === 'upgrade' && good) upgradeNode(state, good);
   if (act === 'cargo-upgrade') buyCargoUpgrade(state, upgradeGood);
   if (act === 'sell' && good) {
-    sellToNpc(state, good, tradeAmount);
+    if (sellToNpc(state, good, tradeAmount)) celebrate('sell');
     if (syncTutorial(state, 'sell')) stepped = true;
   }
   if (act === 'buy' && good) {
-    buyFromNpc(state, good, tradeAmount);
+    if (buyFromNpc(state, good, tradeAmount)) celebrate('buy');
+    if (syncTutorial(state, 'buy')) stepped = true;
+  }
+  if (act === 'haul-sell') {
+    const n = ridgeSellAmount(state);
+    if (n > 0 && sellToNpc(state, 'grain', n)) celebrate('sell');
+    if (syncTutorial(state, 'sell')) stepped = true;
+  }
+  if (act === 'haul-buy') {
+    const n = ridgeBuyOreAmount(state);
+    if (n > 0 && buyFromNpc(state, 'ore', n)) celebrate('buy');
     if (syncTutorial(state, 'buy')) stepped = true;
   }
   if (act === 'cancel') cancelTravel(state);
-  if (act === 'craft') craftCurrent(state);
+  if (act === 'craft') {
+    const beforeBench = state.workbenchCrafted;
+    const beforeBrace = state.timberBraceCrafted;
+    craftCurrent(state);
+    if (state.workbenchCrafted !== beforeBench || state.timberBraceCrafted !== beforeBrace) {
+      celebrate('craft');
+    }
+  }
   if (act === 'pack' && good) {
     packMax(good);
     const input = app.querySelector<HTMLInputElement>(`[data-cargo="${good}"]`);
     if (input) input.value = String(cargoPick[good]);
     writeCargoTotal();
     return;
+  }
+  if (act === 'haul-depart') {
+    const plan = ridgeHaulPlan();
+    destPick = plan.to;
+    feeGood = plan.feeGood;
+    const err = canDepart(state, plan);
+    if (err) {
+      state.log.unshift(err);
+      if (state.log.length > 8) state.log.length = 8;
+    } else {
+      depart(state, plan);
+      GOODS.forEach((g) => (cargoPick[g] = 0));
+      desk = 'none';
+      celebrate('depart');
+    }
+  }
+  if (act === 'haul-return') {
+    const plan = valeReturnPlan();
+    destPick = plan.to;
+    feeGood = plan.feeGood;
+    const err = canDepart(state, plan);
+    if (err) {
+      state.log.unshift(err);
+      if (state.log.length > 8) state.log.length = 8;
+    } else {
+      depart(state, plan);
+      GOODS.forEach((g) => (cargoPick[g] = 0));
+      desk = 'none';
+      celebrate('depart', 'Homeward.');
+    }
   }
   if (act === 'depart') {
     const cargo = { ...cargoPick };
@@ -782,6 +854,8 @@ document.addEventListener('click', (e) => {
     } else {
       depart(state, { to: destPick, cargo, feeGood });
       GOODS.forEach((g) => (cargoPick[g] = 0));
+      desk = 'none';
+      celebrate('depart');
     }
   }
 
@@ -796,6 +870,10 @@ document.addEventListener('click', (e) => {
     act === 'sell' ||
     act === 'buy' ||
     act === 'depart' ||
+    act === 'haul-depart' ||
+    act === 'haul-return' ||
+    act === 'haul-sell' ||
+    act === 'haul-buy' ||
     act === 'cancel';
   afterAction(structural);
 });
@@ -845,7 +923,10 @@ function loop(now: number) {
     }
     const travelling = !!state.travel;
     tick(state, step);
-    if (travelling && !state.travel) arrived = true;
+    if (travelling && !state.travel) {
+      arrived = true;
+      celebrate('arrive');
+    }
     if (syncTutorial(state)) stepped = true;
     acc -= step;
   }

@@ -44,7 +44,20 @@ import {
   inferTutorialStep,
   startTutorial,
   syncTutorial,
+  tutorialBeatsHaveForbidden,
 } from './tutorial';
+import {
+  cheerCopyHasForbidden,
+  firstHaulGrainCargo,
+  firstHaulNeedGrain,
+  firstHaulReady,
+  nextVerb,
+  ridgeBuyOreAmount,
+  ridgeHaulPlan,
+  ridgeSellAmount,
+  valeReturnPlan,
+  verbMarkup,
+} from './haul';
 import {
   deskForTarget,
   placeCopyHasForbidden,
@@ -456,6 +469,22 @@ export function honestyReport(): string[] {
   if (deskForTarget('vale') !== null || deskForTarget('harvest') !== null) {
     errors.push('place/harvest coach must not force a ledger desk');
   }
+  errors.push(...tutorialBeatsHaveForbidden());
+  errors.push(...cheerCopyHasForbidden());
+  if (firstHaulGrainCargo() !== 28) {
+    errors.push(`Ridge haul cargo should be 28 grain, got ${firstHaulGrainCargo()}`);
+  }
+  if (firstHaulNeedGrain() !== 50) {
+    errors.push(`first haul should need 50 grain (20 home + 2 fee + 28 cargo), got ${firstHaulNeedGrain()}`);
+  }
+  const haulPlan = ridgeHaulPlan();
+  if (haulPlan.to !== 'ridge' || haulPlan.feeGood !== 'grain' || haulPlan.cargo.grain !== 28) {
+    errors.push('auto-pack Ridge haul must be 28 grain / fee grain');
+  }
+  const homePlan = valeReturnPlan();
+  if (homePlan.to !== 'vale' || homePlan.feeGood !== 'ore' || homePlan.cargo.ore !== 20) {
+    errors.push('return haul must carry 20 ore / fee ore');
+  }
   if ('npcBooks' in createInitialState()) {
     errors.push('must not include #31 npcBooks stock drift');
   }
@@ -469,24 +498,52 @@ export function honestyReport(): string[] {
   if (walk.tutorial.splash) errors.push('Start in Vale should close the splash');
   if (inferTutorialStep(walk) !== 0) errors.push('empty Vale should stay T0');
 
+  const firstVerb = nextVerb(walk);
+  if (firstVerb.id !== 'harvest' || firstVerb.good !== 'grain') {
+    errors.push('first verb must harvest grain — do not mint');
+  }
+  const grainBeforeTap = walk.stashes.vale.grain;
   walk.energy = HARVEST.energyCap;
   harvestClick(walk, 'grain');
+  if (Math.abs(walk.stashes.vale.grain - (grainBeforeTap + HARVEST.clickAmount)) > 1e-9) {
+    errors.push('first tap must harvest, not mint grain');
+  }
   syncTutorial(walk, 'harvest');
   if (walk.tutorial.step !== 1) errors.push(`after first harvest expected T1, got T${walk.tutorial.step}`);
+  if (nextVerb(walk).id !== 'harvest') errors.push('T1 verb must stay harvest');
+
+  const verbHtml = verbMarkup(walk);
+  if ((verbHtml.match(/class="verb(?: spot)?"/g) || []).length !== 1) {
+    errors.push('first paint must have exactly one primary verb');
+  }
+  if (/<table|desk-panel/i.test(verbHtml)) {
+    errors.push('primary verb chrome must not be a ledger');
+  }
 
   walk.stashes.vale.grain = 8;
   syncTutorial(walk);
   if (walk.tutorial.step !== 2) errors.push(`stacking grain expected T2, got T${walk.tutorial.step}`);
 
+  walk.stashes.vale.grain = 49;
+  syncTutorial(walk);
+  if (firstHaulReady(walk)) errors.push('49 grain must not auto-pack the Ridge haul');
+  if (nextVerb(walk).id !== 'harvest') errors.push('under-haul verb must stay harvest');
+
   walk.stashes.vale.grain = 50;
   syncTutorial(walk);
   if (walk.tutorial.step !== 3) errors.push(`pack-ready expected T3, got T${walk.tutorial.step}`);
+  if (!firstHaulReady(walk) || nextVerb(walk).id !== 'haul-depart') {
+    errors.push('50 grain should spotlight Haul to Ridge');
+  }
 
-  const packed = depart(walk, {
-    to: 'ridge',
-    cargo: { grain: 28, ore: 0, timber: 0, fibre: 0 },
-    feeGood: 'grain',
-  });
+  const packed = depart(walk, ridgeHaulPlan());
+  if (Math.abs(walk.stashes.vale.grain - 20) > 1e-9) {
+    errors.push(`auto-pack must leave 20 grain home, got ${walk.stashes.vale.grain}`);
+  }
+  if (!walk.travel || walk.travel.duration !== 25) {
+    errors.push('first haul must still take the 25s Vale→Ridge road');
+  }
+  if (nextVerb(walk).id !== 'wait') errors.push('in transit the verb must wait — no free travel');
   syncTutorial(walk);
   if (!packed || walk.tutorial.step !== 4) {
     errors.push(`depart Ridge expected T4, got T${walk.tutorial.step}`);
@@ -504,20 +561,25 @@ export function honestyReport(): string[] {
   if (walk.log[0] !== 'Ridge. Market open.') {
     errors.push(`Ridge log should be market-open, got: ${walk.log[0]}`);
   }
+  if (ridgeSellAmount(walk) !== 28 || nextVerb(walk).id !== 'haul-sell') {
+    errors.push('Ridge arrival should one-confirm sell 28 grain');
+  }
 
-  sellToNpc(walk, 'grain', 28);
+  sellToNpc(walk, 'grain', ridgeSellAmount(walk));
   syncTutorial(walk, 'sell');
-  buyFromNpc(walk, 'ore', 22);
+  if (ridgeBuyOreAmount(walk) !== 22 || nextVerb(walk).id !== 'haul-buy') {
+    errors.push('after grain sale the verb should one-confirm buy 22 ore');
+  }
+  buyFromNpc(walk, 'ore', ridgeBuyOreAmount(walk));
   syncTutorial(walk, 'buy');
+  if (nextVerb(walk).id !== 'haul-return') {
+    errors.push('after ore buy the verb should return to Vale');
+  }
   if (walk.tutorial.step !== 6) errors.push(`after ore buy expected T6, got T${walk.tutorial.step}`);
   if (!walk.log.some((l) => l === 'Sold 28 grain.')) errors.push('sell log should be Sold N grain');
   if (!walk.log.some((l) => l === 'Bought 22 ore.')) errors.push('buy log should be Bought N ore');
 
-  const home = depart(walk, {
-    to: 'vale',
-    cargo: { grain: 0, ore: 20, timber: 0, fibre: 0 },
-    feeGood: 'ore',
-  });
+  const home = depart(walk, valeReturnPlan());
   syncTutorial(walk);
   if (!home || walk.tutorial.step !== 6) errors.push('return trip should stay T6');
   walk.travel!.elapsed = walk.travel!.duration;
@@ -655,4 +717,4 @@ if (errors.length) {
   console.error('Honesty failed:\n' + errors.map((e) => ` - ${e}`).join('\n'));
   throw new Error('honesty');
 }
-console.log('Honesty ok: Vale cannot harvest ore or timber; Workbench then Timber brace; cargo +5 only after brace; paid cart stacks on current cap; Ridge ore 1.3P; no transit idle; no arrival full-tick credit; place scene + timber fork + region map you-only.');
+console.log('Honesty ok: Vale cannot harvest ore or timber; Workbench then Timber brace; cargo +5 only after brace; paid cart stacks on current cap; Ridge ore 1.3P; no transit idle; no arrival full-tick credit; place scene + one verb; first haul harvests then 25s Ridge road; timber fork + region map you-only.');
