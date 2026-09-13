@@ -22,7 +22,16 @@ import {
   WORKBENCH_UNLOCK_CARGO,
 } from './game';
 import { saveGame, loadGame, resetGame, clearSave } from './persist';
+import { HELP_KEY } from './config';
 import { loadHelpOpen, saveHelpOpen } from './help';
+import {
+  T0_LOG,
+  TUTORIAL_STEPS,
+  dismissTutorial,
+  inferTutorialStep,
+  startTutorial,
+  syncTutorial,
+} from './tutorial';
 
 function installMemoryStorage() {
   const store = new Map<string, string>();
@@ -155,13 +164,100 @@ export function honestyReport(): string[] {
     errors.push(`buy confirm must spend amount × unit, got ${bulk.coin}`);
   }
 
+  if (vale.log[0] !== T0_LOG) errors.push('initial log must be the T0 one-liner');
+  if (/1\.05|carry ~28|honesty/i.test(vale.log.join(' '))) {
+    errors.push('initial log still dumps the old route recipe');
+  }
+  if (/honesty/i.test(TUTORIAL_STEPS[4].html)) {
+    errors.push('T4 must not say honesty');
+  }
+
+  const walk = createInitialState();
+  if (!walk.tutorial.splash || walk.tutorial.step !== 0) {
+    errors.push('fresh save must start on splash + T0');
+  }
+  startTutorial(walk);
+  syncTutorial(walk, 'start');
+  if (walk.tutorial.splash) errors.push('Start in Vale should close the splash');
+  if (inferTutorialStep(walk) !== 0) errors.push('empty Vale should stay T0');
+
+  walk.energy = HARVEST.energyCap;
+  harvestClick(walk, 'grain');
+  syncTutorial(walk, 'harvest');
+  if (walk.tutorial.step !== 1) errors.push(`after first harvest expected T1, got T${walk.tutorial.step}`);
+
+  walk.stashes.vale.grain = 8;
+  syncTutorial(walk);
+  if (walk.tutorial.step !== 2) errors.push(`stacking grain expected T2, got T${walk.tutorial.step}`);
+
+  walk.stashes.vale.grain = 50;
+  syncTutorial(walk);
+  if (walk.tutorial.step !== 3) errors.push(`pack-ready expected T3, got T${walk.tutorial.step}`);
+
+  const packed = depart(walk, {
+    to: 'ridge',
+    cargo: { grain: 28, ore: 0, timber: 0, fibre: 0 },
+    feeGood: 'grain',
+  });
+  syncTutorial(walk);
+  if (!packed || walk.tutorial.step !== 4) {
+    errors.push(`depart Ridge expected T4, got T${walk.tutorial.step}`);
+  }
+  if (!walk.log[0].includes('Left Vale for Ridge')) {
+    errors.push(`depart log should match Fable haul voice, got: ${walk.log[0]}`);
+  }
+
+  walk.travel!.elapsed = walk.travel!.duration;
+  tick(walk, 0.05);
+  syncTutorial(walk);
+  if (walk.region !== 'ridge' || walk.tutorial.step !== 5) {
+    errors.push(`Ridge arrival expected T5, got T${walk.tutorial.step} region=${walk.region}`);
+  }
+  if (walk.log[0] !== 'Ridge. Market open.') {
+    errors.push(`Ridge log should be market-open, got: ${walk.log[0]}`);
+  }
+
+  sellToNpc(walk, 'grain', 28);
+  syncTutorial(walk, 'sell');
+  buyFromNpc(walk, 'ore', 22);
+  syncTutorial(walk, 'buy');
+  if (walk.tutorial.step !== 6) errors.push(`after ore buy expected T6, got T${walk.tutorial.step}`);
+  if (!walk.log.some((l) => l === 'Sold 28 grain.')) errors.push('sell log should be Sold N grain');
+  if (!walk.log.some((l) => l === 'Bought 22 ore.')) errors.push('buy log should be Bought N ore');
+
+  const home = depart(walk, {
+    to: 'vale',
+    cargo: { grain: 0, ore: 20, timber: 0, fibre: 0 },
+    feeGood: 'ore',
+  });
+  syncTutorial(walk);
+  if (!home || walk.tutorial.step !== 6) errors.push('return trip should stay T6');
+  walk.travel!.elapsed = walk.travel!.duration;
+  tick(walk, 0.05);
+  syncTutorial(walk);
+  if (walk.tutorial.step !== 7) errors.push(`Vale with 20 ore expected T7, got T${walk.tutorial.step}`);
+
+  if (!craftWorkbench(walk) || !walk.workbenchCrafted) {
+    errors.push('first-trip walk failed to craft Workbench');
+  }
+  syncTutorial(walk);
+  if (walk.tutorial.step !== 8) errors.push(`craft expected T8, got T${walk.tutorial.step}`);
+  if (walk.log[0] !== 'Workbench stands in Vale.') {
+    errors.push(`craft log should be Workbench stands in Vale, got: ${walk.log[0]}`);
+  }
+
+  dismissTutorial(walk);
+  if (!walk.tutorial.dismissed) errors.push('Got it should dismiss the coach');
+
   installMemoryStorage();
-  if (!loadHelpOpen()) errors.push('helper should open on first visit');
-  if (loadHelpOpen()) errors.push('helper should default off after first open');
+  if (loadHelpOpen()) errors.push('helper should stay closed on first visit');
+  if (loadHelpOpen()) errors.push('helper should stay closed after first-visit store');
   saveHelpOpen(true);
   if (!loadHelpOpen()) errors.push('helper on preference not remembered');
   saveHelpOpen(false);
   if (loadHelpOpen()) errors.push('helper off preference not remembered');
+  saveHelpOpen(true);
+  const helperBeforeReset = localStorage.getItem(HELP_KEY);
 
   const saved = createInitialState();
   saved.stashes.vale.grain = 17;
@@ -170,6 +266,9 @@ export function honestyReport(): string[] {
   saved.energy = 11;
   saved.nodes.vale.grain = 3;
   saved.workbenchCrafted = false;
+  saved.tutorial.splash = false;
+  saved.tutorial.dismissed = true;
+  saved.tutorial.step = 3;
   saveGame(saved);
   const loaded = loadGame();
   if (!loaded) errors.push('loadGame returned null after save');
@@ -180,10 +279,19 @@ export function honestyReport(): string[] {
     if (loaded.energy !== 11) errors.push('persist lost energy');
     if (loaded.nodes.vale.grain !== 3) errors.push('persist lost node level');
     if (loaded.region !== 'vale') errors.push('persist lost region');
+    if (!loaded.tutorial.dismissed || loaded.tutorial.step !== 3) {
+      errors.push('persist lost tutorial dismiss / step');
+    }
   }
   const reset = resetGame();
   if (reset.stashes.vale.grain !== 0 || reset.energy !== HARVEST.energyCap) {
     errors.push('resetGame did not restore initial stash/energy');
+  }
+  if (!reset.tutorial.splash || reset.tutorial.step !== 0 || reset.tutorial.dismissed) {
+    errors.push('reset must restart splash + T0–T8');
+  }
+  if (localStorage.getItem(HELP_KEY) !== helperBeforeReset) {
+    errors.push('reset must not touch regional-trade-helper');
   }
   if (loadGame() !== null) errors.push('reset left a localStorage snapshot');
   clearSave();

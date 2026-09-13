@@ -36,6 +36,14 @@ import {
 import { loadGame, saveGame, resetGame } from './persist';
 import { applyHelp, loadHelpOpen, mountHelper, saveHelpOpen } from './help';
 import { goodChip, goodIcon, panelMark, regionCrest } from './icons';
+import {
+  coachMarkup,
+  coachTarget,
+  dismissTutorial,
+  splashMarkup,
+  startTutorial,
+  syncTutorial,
+} from './tutorial';
 
 let state: GameState = loadGame() ?? createInitialState();
 const cargoPick: Inventory = { grain: 0, ore: 0, timber: 0, fibre: 0 };
@@ -64,6 +72,10 @@ function regionLabel(): string {
 
 function persistNow() {
   saveGame(state);
+}
+
+function paintHelp() {
+  applyHelp(helpOpen && !state.tutorial.splash);
 }
 
 function readForm() {
@@ -124,7 +136,7 @@ function completeCopy(): string {
 
 function goalBlock(): string {
   if (state.workbenchCrafted) {
-    return `<div class="win complete-chip"><span class="lbl">Workbench</span><strong>Built</strong><span class="muted">Next board still needs ${GOOD_LABEL[NEXT_RECIPE_NEEDS]}</span></div>`;
+    return `<div class="win complete-chip"><span class="lbl">Workbench</span><strong>Built</strong><span class="muted">Next board still wants ${GOOD_LABEL[NEXT_RECIPE_NEEDS].toLowerCase()}</span></div>`;
   }
   const here = state.region ? state.stashes[state.region] : null;
   const parts = (Object.entries(WORKBENCH_COST) as [Good, number][]).map(([g, need]) => {
@@ -135,7 +147,8 @@ function goalBlock(): string {
       !ok && other ? ` <em data-goal-else="${g}">(${other})</em>` : `<em data-goal-else="${g}" hidden></em>`
     }</span>`;
   });
-  return `<div class="goal"><span class="lbl">Workbench</span> ${parts.join('')}</div>`;
+  const mark = coachTarget(state);
+  return `<div class="goal${mark === 'goal' ? ' coach-target' : ''}"><span class="lbl">Workbench</span> ${parts.join('')}</div>`;
 }
 
 function regionRail(): string {
@@ -153,13 +166,13 @@ function stashCard(id: RegionId): string {
   const r = REGIONS[id];
   const here = state.region === id && !state.travel;
   return `
-    <article class="stash ${here ? 'here' : ''} ${id}">
+    <article class="stash ${here ? 'here' : ''} ${id}${coachTarget(state) === id ? ' coach-target' : ''}">
       <header>
         <div class="who">
           ${regionCrest(id)}
           <div>
             <strong>${r.name}</strong>
-            <span class="tag">${here ? 'You are here' : 'Stash'}</span>
+            <span class="tag">${r.place}${here ? ' · You are here' : ''}</span>
           </div>
         </div>
         <span class="locals">${r.local.map((g) => goodIcon(g)).join('')}</span>
@@ -194,12 +207,14 @@ function render() {
     ? Math.min(100, (state.travel.elapsed / state.travel.duration) * 100)
     : 0;
 
+  const mark = coachTarget(state);
+
   app.innerHTML = `
     <div class="wrap">
       <header class="top">
         <div>
-          <h1>Regional Trade</h1>
-          <p class="sub">Solo v1 — harvest local, carry the gap, buy the missing good</p>
+          <h1>Regional trade</h1>
+          <p class="sub">Harvest what grows here. Carry what does not.</p>
           <ul class="loop">
             <li>Harvest</li>
             <li>Travel</li>
@@ -239,19 +254,21 @@ function render() {
         ${goalBlock()}
       </section>
 
+      ${coachMarkup(state)}
+
       ${
         state.travel
           ? `
-        <section class="panel travel-live">
+        <section class="panel travel-live${mark === 'travel-live' ? ' coach-target' : ''}">
           <h2>${panelMark('travel')} Travel</h2>
-          <p class="paused">Idle harvest paused</p>
-          <p>Not in a region. Cargo does not sit in a stash until you arrive.</p>
+          <p class="paused">Idle waits at home</p>
+          <p>On the road: no harvest. Cargo rides with you.</p>
           <p class="cargo-line">Cargo ${fmt(GOODS.reduce((s, g) => s + state.travel!.cargo[g], 0))} / ${TRAVEL.cargoCap}
             ${GOODS.filter((g) => state.travel!.cargo[g] > 0)
               .map((g) => `${goodChip(g)} ${fmt(state.travel!.cargo[g])}`)
               .join(' ')}
           </p>
-          <button type="button" class="sec" data-act="cancel">Cancel (lose fee, cargo returns to ${REGIONS[state.travel.from].name})</button>
+          <button type="button" class="sec" data-act="cancel">Cancel (burns fee, cargo comes home to ${REGIONS[state.travel.from].name})</button>
         </section>`
           : ''
       }
@@ -264,9 +281,9 @@ function render() {
         ${
           inRegion && region && stash
             ? `
-          <section class="panel harvest">
+          <section class="panel harvest${mark === 'harvest' ? ' coach-target' : ''}">
             <h2>${panelMark('harvest')} Harvest <span class="muted">local only</span></h2>
-            <p class="hint">Click +${HARVEST.clickAmount} · idle +${HARVEST.idlePerSecond}/s × node · pauses in transit. Energy regen 1 / ${HARVEST.energyRegenSeconds}s.</p>
+            <p class="hint">Click +${HARVEST.clickAmount} local while you stand here. Idle +${HARVEST.idlePerSecond}/s × node — quiet on the road. Energy regen 1 / ${HARVEST.energyRegenSeconds}s.</p>
             <div class="row">
               ${region.local
                 .map((g) => {
@@ -292,9 +309,9 @@ function render() {
             <p class="hint foreign-note">${region.name} cannot harvest ${region.foreign.map((g) => GOOD_LABEL[g]).join(' or ')}.</p>
           </section>
 
-          <section class="panel npc">
+          <section class="panel npc${mark === 'market' ? ' coach-target' : ''}">
             <h2>${panelMark('market')} NPC market <span class="muted">${region.name}</span></h2>
-            <p class="hint">Coin only — sell for coin, buy with coin. No barter. Spreads from config: local buy 0.7P / sell 1.3P, foreign buy 1.05P / sell 1.15P (P=1). Ridge ore sells at <strong>1.3</strong>.</p>
+            <p class="hint">Coin only. Sell for coin, buy with coin. No barter.</p>
             <div class="trade-amt">
               <label for="tradeAmt">Amount</label>
               <input type="number" id="tradeAmt" min="1" step="1" value="${tradeAmount}" />
@@ -338,9 +355,9 @@ function render() {
             </table>
           </section>
 
-          <section class="panel depart">
+          <section class="panel depart${mark === 'travel' ? ' coach-target' : ''}">
             <h2>${panelMark('travel')} Travel</h2>
-            <p class="hint">Fee ${TRAVEL.feeAmount} of a <em>local</em> good. Cargo cap ${TRAVEL.cargoCap}. Idle pauses. Direct Vale↔Ridge ${travelSeconds('vale', 'ridge')}s. Two-hop Vale→Cross→Ridge ${travelSeconds('vale', 'cross')}s + ${travelSeconds('cross', 'ridge')}s (no new buildings).</p>
+            <p class="hint">Fee in a local good. Cargo cap holds. Idle waits at home.</p>
             <div class="routes" aria-label="Routes">
               <span>Vale ↔ Ridge ${travelSeconds('vale', 'ridge')}s</span>
               <span>Vale ↔ Cross ${travelSeconds('vale', 'cross')}s</span>
@@ -380,7 +397,7 @@ function render() {
             <p class="meta" id="ui-cargo-total">Cargo ${fmt(cargoTotalPick())} / ${TRAVEL.cargoCap}${cargoHint()}</p>
           </section>
 
-          <section class="panel craft">
+          <section class="panel craft${mark === 'craft' ? ' coach-target' : ''}">
             <h2>${panelMark('craft')} Craft</h2>
             ${
               state.workbenchCrafted
@@ -389,7 +406,7 @@ function render() {
                     <h3>Workbench built</h3>
                     <p>${completeCopy()}</p>
                   </div>`
-                : `<p class="hint">Goods must be in <em>this</em> stash. Vale has no ore node — finish the Ridge (or Cross→Ridge) trip.</p>
+                : `<p class="hint">Ore is not local in Vale. Finish a Ridge trip (or Cross→Ridge), then craft here.</p>
             <button type="button" data-act="craft" ${craftErr ? 'disabled' : ''}>
               Craft Workbench (20 grain + 20 ore)
             </button>
@@ -400,8 +417,8 @@ function render() {
             : `
           <section class="panel harvest muted-panel">
             <h2>${panelMark('harvest')} Harvest</h2>
-            <p class="paused">Idle harvest paused</p>
-            <p class="hint">No clicks, no idle while you are on the road.</p>
+            <p class="paused">Idle waits at home</p>
+            <p class="hint">On the road: no harvest.</p>
           </section>
           <section class="panel npc muted-panel">
             <h2>${panelMark('market')} NPC market</h2>
@@ -415,11 +432,12 @@ function render() {
         <h2>${panelMark('log')} Log</h2>
         <ul id="ui-log">${state.log.map((l) => `<li>${l}</li>`).join('')}</ul>
       </section>
+      ${state.tutorial.splash ? splashMarkup() : ''}
     </div>
   `;
   dirty = false;
   paintTradePanel();
-  applyHelp(helpOpen);
+  paintHelp();
 }
 
 function paintLive() {
@@ -532,9 +550,10 @@ function afterAction(full: boolean) {
 }
 
 function toggleHelp() {
+  if (state.tutorial.splash) return;
   helpOpen = !helpOpen;
   saveHelpOpen(helpOpen);
-  applyHelp(helpOpen);
+  paintHelp();
 }
 
 document.addEventListener('click', (e) => {
@@ -549,8 +568,24 @@ document.addEventListener('click', (e) => {
   const good = t.dataset.good as Good | undefined;
   readForm();
 
+  if (act === 'tutorial-start') {
+    startTutorial(state);
+    syncTutorial(state, 'start');
+    persistNow();
+    dirty = true;
+    render();
+    return;
+  }
+  if (act === 'tutorial-dismiss') {
+    dismissTutorial(state);
+    persistNow();
+    dirty = true;
+    render();
+    return;
+  }
+
   if (act === 'reset') {
-    if (!confirm('Reset stash, nodes, coin, energy, and region? This clears the game save, not the Help preference.')) return;
+    if (!confirm('Reset stash, nodes, coin, energy, and region? This clears the game save and restarts the first-trip walk, not the Help preference.')) return;
     state = resetGame();
     GOODS.forEach((g) => (cargoPick[g] = 0));
     destPick = 'ridge';
@@ -562,11 +597,21 @@ document.addEventListener('click', (e) => {
 
   const wasTravelling = !!state.travel;
   const wasRegion = state.region;
+  let stepped = false;
 
-  if (act === 'harvest' && good) harvestClick(state, good);
+  if (act === 'harvest' && good) {
+    harvestClick(state, good);
+    if (syncTutorial(state, 'harvest')) stepped = true;
+  }
   if (act === 'upgrade' && good) upgradeNode(state, good);
-  if (act === 'sell' && good) sellToNpc(state, good, tradeAmount);
-  if (act === 'buy' && good) buyFromNpc(state, good, tradeAmount);
+  if (act === 'sell' && good) {
+    sellToNpc(state, good, tradeAmount);
+    if (syncTutorial(state, 'sell')) stepped = true;
+  }
+  if (act === 'buy' && good) {
+    buyFromNpc(state, good, tradeAmount);
+    if (syncTutorial(state, 'buy')) stepped = true;
+  }
   if (act === 'cancel') cancelTravel(state);
   if (act === 'craft') craftWorkbench(state);
   if (act === 'pack' && good) {
@@ -588,9 +633,11 @@ document.addEventListener('click', (e) => {
     }
   }
 
+  if (syncTutorial(state)) stepped = true;
   const structural =
     !!state.travel !== wasTravelling ||
     state.region !== wasRegion ||
+    stepped ||
     act === 'craft' ||
     act === 'upgrade' ||
     act === 'sell' ||
@@ -607,10 +654,10 @@ app.addEventListener('input', () => {
 });
 
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && helpOpen) {
+  if (e.key === 'Escape' && helpOpen && !state.tutorial.splash) {
     helpOpen = false;
     saveHelpOpen(false);
-    applyHelp(false);
+    paintHelp();
   }
 });
 
@@ -630,10 +677,16 @@ function loop(now: number) {
   acc += dt;
   persistAcc += dt;
   let arrived = false;
+  let stepped = false;
   while (acc >= step) {
+    if (state.tutorial.splash) {
+      acc -= step;
+      continue;
+    }
     const travelling = !!state.travel;
     tick(state, step);
     if (travelling && !state.travel) arrived = true;
+    if (syncTutorial(state)) stepped = true;
     acc -= step;
   }
 
@@ -642,7 +695,7 @@ function loop(now: number) {
     persistAcc = 0;
   }
 
-  if (arrived || dirty) {
+  if (arrived || stepped || dirty) {
     dirty = true;
     render();
   } else {
