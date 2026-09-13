@@ -2,7 +2,7 @@
 
 Playable one-loop prototype: **harvest local → travel → trade with NPC → craft Workbench → haul timber → craft Timber brace**.
 
-First paint is the place you stand in (Vale Fields / Ridge Heights / Cross Way) — scene, traveler, and a region map that marks only you. Market quotes, cargo amounts, and coin live in **Trade at the stall**, **Pack the road**, and **The bench**. When Timber brace is the open gate, Pack shows a Ridge vs Cross grain-vs-time fork (not a global board).
+First paint is the place you stand in (Vale Fields / Ridge Heights / Cross Way) — scene, traveler, and a region map that marks only you. On a phone, that scene + **one verb** (harvest / haul / sell / buy / craft) own the first screen; map and goal sit as overlays. Market quotes, cargo amounts, and coin live in **Trade at the stall**, **Pack the road**, and **The bench**, closed until tapped. When Timber brace is the open gate, Pack shows a Ridge vs Cross grain-vs-time fork (not a global board).
 
 Constants match `REGIONAL-TRADE.md` (V1 constants). All numbers live in `src/config.ts`. No invented 1:1 NPC, no player books, no AI traders.
 
@@ -37,7 +37,7 @@ Progress (stash per region, nodes, coin, energy, region, in-transit cargo, Workb
 
 **Help** is toggleable Field notes (concepts, not the first-trip walk). First visit stays closed and stores `regional-trade-helper=off`; it never auto-reopens after that. Reset save does not clear that preference.
 
-A dismissible **first-trip walk** (splash + T0–T8 coach) takes a new player from Vale to a Ridge haul and the Workbench without the README. **Got it** dismisses the coach. Reset save restarts T0–T8. Copy lives in `docs/NARRATIVE-PACK-v1.md`.
+A dismissible **first haul** (splash + T0–T8) takes a new player from Vale to Ridge and the Workbench: harvest for real, auto-pack once 50 grain is in, walk the 25s road, sell/buy with one confirm, craft. Spotlight the next verb. Short celebration beats. **Got it** dismisses the walk. Reset save restarts T0–T8. Copy lives in `docs/NARRATIVE-PACK-v1.md`.
 
 ## Deploy `dist/` as static files
 
@@ -88,7 +88,8 @@ Honesty: cannot craft Workbench without leaving Vale (ore is foreign there); can
 | `src/main.ts` | Place-first UI (NPC totals = amount × unit, live; numbers in drawers) |
 | `src/place.ts` | Place mood, region map stub, Timber brace travel fork |
 | `src/help.ts` | Toggleable Field notes + localStorage pref |
-| `src/tutorial.ts` | Splash + T0–T8 first-trip coach |
+| `src/tutorial.ts` | Splash + T0–T8 first-haul beats |
+| `src/haul.ts` | Directed first-haul verb, auto-pack, one-confirm trade |
 | `src/mission.ts` | Workbench / Timber brace why-copy |
 | `src/icons.ts` | SVG tiles for goods / regions / panels |
 | `docs/NARRATIVE-PACK-v1.md` | Voice, splash, T0–T8, Field notes |

@@ -15,19 +15,19 @@ Reset save shows the splash again. It does not touch the `regional-trade-helper`
 
 ## Soft steps T0–T8
 
-One at a time. Coach mark plus the T0 log line. **Got it** dismisses the coach for this save.
+Directed first haul. Spotlight the next verb. Short beat on the scene — not a tip dump. Celebrate depart / arrive / sell / buy / craft. **Got it** dismisses the walk for this save. First tap still harvests. Auto-pack Ridge (leave 20, fee 2, ~28 cargo) once the grain is there. The 25s road still runs.
 
 | Step | When | Copy |
 |---|---|---|
-| T0 Arrive Vale | Fresh board, empty stash | Grain and fibre grow here. Ore does not. The Workbench wants both. |
-| T1 First harvest | First click or first idle grain | Click while you stand here. Idle ticks only in-region. Energy refills slowly — burst, then wait. |
-| T2 Goal | Grain stacking | Stack grain. Keep **20** in the Vale stash for the craft. Pack the rest for the road. |
-| T3 Pack | Enough grain to leave 20 + fee | Fee **2** grain. Cargo ~**28** grain (cap 40). Leave **20** home. Destination: **Ridge** (25s). Cross is a longer classroom, not required. |
-| T4 Transit | On the road | On the road: no harvest. Cargo rides with you. Cancel returns cargo and burns the fee. |
-| T5 Ridge | Standing in Ridge | Sell grain for coin. Buy ore. Ridge grows ore — expect the local sell price. Totals = amount × each. |
-| T6 Return | Ore bought or packed for home | Keep fee goods for the return. Carry **20 ore** back to Vale. |
-| T7 Craft | 20 ore sitting in the Vale stash | Goods must sit in *this* stash. Craft the Workbench. |
-| T8 Complete | Workbench built | Built. Next: timber brace — still a foreign spend here. Another trip later. Field notes stay under Help. |
+| T0 Arrive Vale | Fresh board, empty stash | Beat: Grain grows. Ore does not. |
+| T1 First harvest | First click or first idle grain | Beat: Burst the grain. |
+| T2 Goal | Grain stacking | Beat: Stack for the road. |
+| T3 Pack | Enough grain to leave 20 + fee + 28 cargo | Beat: Pack for Ridge. Verb: Haul to Ridge · 25s (auto-pack). |
+| T4 Transit | On the road | Beat: The road takes its time. |
+| T5 Ridge | Standing in Ridge | Beat: Sell. Buy ore. One confirm each. |
+| T6 Return | Ore bought or packed for home | Beat: Carry ore home. |
+| T7 Craft | 20 ore sitting in the Vale stash | Beat: Craft the bench. |
+| T8 Complete | Workbench built | Beat: Built. Timber later. |
 
 The old `createInitialState` route dump is gone. The log opens on the T0 one-liner; the driver moves the coach.
 
@@ -46,7 +46,7 @@ The old `createInitialState` route dump is gone. The log opens on the T0 one-lin
 
 Optional region labels: Vale Fields / Ridge Heights / Cross Way.
 
-Place scene (first paint): standing in the region, not a ledger. Mood — Vale: Low fields. Soft fibre. Grain underfoot. Ridge: Stone and sawdust. Heights, not a market hall. Cross: A way-station, not a capital. Market, cargo amounts, and coin wait in Trade / Pack / Craft drawers. Region map stub marks you; no one else stands here.
+Place scene (first paint, especially phone-width): standing in the region, not a ledger. Full-bleed Vale Fields + one verb. Map marker and goal chip overlay the scene. Trade / Pack / Bench stay closed. Mood — Vale: Low fields. Soft fibre. Grain underfoot. Ridge: Stone and sawdust. Heights, not a market hall. Cross: A way-station, not a capital. Market, cargo amounts, and coin wait in Trade / Pack / Craft drawers. Region map stub marks you; no one else stands here.
 
 ## Field notes
 

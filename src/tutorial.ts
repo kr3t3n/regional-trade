@@ -20,51 +20,60 @@ export const T0_LOG = 'Grain and fibre grow here. Ore does not. The Workbench wa
 
 export const TUTORIAL_STEPS: Record<
   TutorialStep,
-  { kicker: string; html: string; target: string }
+  { kicker: string; html: string; beat: string; target: string }
 > = {
   0: {
     kicker: 'Arrive Vale',
     html: 'Grain and fibre grow here. Ore does not. The Workbench wants both.',
+    beat: 'Grain grows. Ore does not.',
     target: 'vale',
   },
   1: {
     kicker: 'First harvest',
     html: 'Click while you stand here. Idle ticks only in-region. Energy refills slowly — burst, then wait.',
+    beat: 'Burst the grain.',
     target: 'harvest',
   },
   2: {
     kicker: 'Goal',
     html: 'Stack grain. Keep <strong>20</strong> in the Vale stash for the craft. Pack the rest for the road.',
+    beat: 'Stack for the road.',
     target: 'goal',
   },
   3: {
     kicker: 'Pack',
     html: 'Fee <strong>2</strong> grain. Cargo ~<strong>28</strong> grain (cap 40). Leave <strong>20</strong> home. Destination: <strong>Ridge</strong> (25s). Cross is a longer classroom, not required.',
+    beat: 'Pack for Ridge.',
     target: 'travel',
   },
   4: {
     kicker: 'Transit',
     html: 'On the road: no harvest. Cargo rides with you. Cancel returns cargo and burns the fee.',
+    beat: 'The road takes its time.',
     target: 'travel-live',
   },
   5: {
     kicker: 'Ridge',
     html: 'Sell grain for coin. Buy ore. Ridge grows ore — expect the local sell price. Totals = amount × each.',
+    beat: 'Sell. Buy ore.',
     target: 'market',
   },
   6: {
     kicker: 'Return',
     html: 'Keep fee goods for the return. Carry <strong>20 ore</strong> back to Vale.',
+    beat: 'Carry ore home.',
     target: 'travel',
   },
   7: {
     kicker: 'Craft',
     html: 'Goods must sit in <em>this</em> stash. Craft the Workbench.',
+    beat: 'Craft the bench.',
     target: 'craft',
   },
   8: {
     kicker: 'Complete',
     html: 'Built. Next: timber brace — still a foreign spend here. Another trip later. Field notes stay under Help.',
+    beat: 'Built. Timber later.',
     target: 'craft',
   },
 };
@@ -157,14 +166,25 @@ export function coachMarkup(state: GameState): string {
   if (!tutorialActive(state)) return '';
   const step = TUTORIAL_STEPS[state.tutorial.step];
   return `
-    <aside class="coach" data-step="t${state.tutorial.step}" role="status">
+    <aside class="coach haul-beat" data-step="t${state.tutorial.step}" role="status">
       <div>
-        <p class="lbl">First trip · T${state.tutorial.step}</p>
+        <p class="lbl">First haul · T${state.tutorial.step}</p>
         <p class="coach-kicker">${step.kicker}</p>
-        <p class="coach-body">${step.html}</p>
+        <p class="coach-body">${step.beat}</p>
       </div>
       <button type="button" class="ghost" data-act="tutorial-dismiss">Got it</button>
     </aside>`;
+}
+
+export function tutorialBeatsHaveForbidden(): string[] {
+  const blob = Object.values(TUTORIAL_STEPS)
+    .map((s) => `${s.beat} ${s.html} ${s.kicker}`)
+    .join(' ');
+  const errors: string[] = [];
+  if (/honesty|free travel|global board|1:1/i.test(blob)) {
+    errors.push('tutorial beats must not spoil honesty suite');
+  }
+  return errors;
 }
 
 export function coachTarget(state: GameState): string {
