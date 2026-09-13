@@ -163,10 +163,10 @@ function sceneArt(kind: RegionId | 'transit'): string {
       <rect width="640" height="240" fill="#8aa8b4"/>
       <rect y="0" width="640" height="118" fill="#9eb6c0"/>
       <ellipse cx="520" cy="42" rx="38" ry="38" fill="#f3ead0" opacity=".55"/>
-      <path fill="#6d8a3c" d="M0 128c70-28 140-22 210-8 80 16 150-10 230-6 70 4 130 22 200 8v118H0V128Z"/>
-      <path fill="#7d9a48" d="M0 152c90-18 170 8 250 4 90-4 160-24 250-10 60 8 100 16 140 6v88H0V152Z"/>
-      <path fill="#c4a35a" opacity=".55" d="M40 186 48 152h4l8 34h-6l-4-18-4 18zm24 0 6-30h3.5l7 30h-5l-3.2-16-3.3 16zm22 0 7-32h4l8 32h-5.5l-4-17-3.5 17zm26 0 5-28h3l6 28h-5l-2.5-14-2.5 14z"/>
-      <path fill="#c4a35a" opacity=".45" d="M320 194 328 158h4l9 36h-6l-4.5-19-4.5 19zm28 0 7-32h3.5l8 32h-5.5l-3.5-16-3.5 16zm24 0 6-30h4l7 30h-5l-3-15-3 15z"/>
+      <path fill="#6d8a3c" d="M0 108c70-28 140-22 210-8 80 16 150-10 230-6 70 4 130 22 200 8v138H0V108Z"/>
+      <path fill="#7d9a48" d="M0 138c90-18 170 8 250 4 90-4 160-24 250-10 60 8 100 16 140 6v102H0V138Z"/>
+      <path fill="#c4a35a" opacity=".7" d="M40 186 48 142h5l9 44h-7l-4.5-22-4.5 22zm28 0 7-38h4.5l8 38h-6l-4-20-4 20zm26 0 8-40h5l9 40h-7l-4.5-21-4.5 21zm30 0 6-34h4l7 34h-6l-3-16-3 16z"/>
+      <path fill="#d4b45a" opacity=".65" d="M300 198 310 150h5l10 48h-7l-5-24-5 24zm32 0 8-40h4.5l9 40h-7l-4-20-4 20zm28 0 7-36h5l8 36h-6l-4-18-4 18z"/>
       <path fill="#8aa85a" d="M118 200c8-14 22-16 28-6 6-12 18-14 24-2 4-10 14-12 18 0v18H118v-10Z"/>
       <path fill="#6f8a42" d="M470 198c10-16 26-18 34-6 8-14 22-16 28 0v20H470v-14Z"/>
     </svg>`;
@@ -211,13 +211,13 @@ export function regionMapMarkup(state: GameState, desk: DeskId): string {
   const place = region ? PLACE[region] : PLACE.vale;
   const you = youMapNode(state, desk);
   const nodes: { id: MapNode; label: string; x: number; y: number }[] = [
-    { id: 'harvest', label: place.harvestNode, x: 36, y: 42 },
-    { id: 'market', label: place.marketNode, x: 164, y: 42 },
-    { id: 'road', label: 'Road', x: 100, y: 96 },
+    { id: 'harvest', label: place.harvestNode, x: 40, y: 44 },
+    { id: 'market', label: place.marketNode, x: 160, y: 44 },
+    { id: 'road', label: 'Road', x: 100, y: 92 },
   ];
   return `
     <figure class="region-map" aria-label="Region map">
-      <svg viewBox="0 0 200 128" role="img" aria-label="${place.title} map. You are the only one here.">
+      <svg viewBox="0 0 200 136" role="img" aria-label="${place.title} map. You are the only one here.">
         <path class="map-edge" d="M36 42h128M36 42 100 96M164 42 100 96"/>
         ${nodes
           .map(
@@ -290,18 +290,20 @@ export function placeSceneMarkup(
     <section class="place ${kind}${hereId ? ` ${hereId}` : ''}${
       opts.coachVale ? ' coach-target' : ''
     }" data-place="${kind}" data-region="${hereId || 'road'}">
-      <div class="place-art" aria-hidden="true">
-        ${sceneArt(kind)}
-        <div class="traveler ${state.travel ? 'walk' : 'stand'}">${travelerSvg()}</div>
+      <div class="place-stage">
+        <div class="place-art" aria-hidden="true">
+          ${sceneArt(kind)}
+          <div class="traveler ${state.travel ? 'walk' : 'stand'}">${travelerSvg()}</div>
+        </div>
+        <div class="place-copy">
+          <p class="lbl">${state.travel ? 'In transit' : 'You stand in'}</p>
+          <h2 class="place-title">${regionCrest(state.travel ? state.travel.to : (state.region ?? 'vale'))}${placeHereLabel(state)}</h2>
+          <p class="place-mood">${placeMood(state)}</p>
+          <p class="place-voice">${placeVoice(state)}</p>
+          ${opts.energyHtml}
+        </div>
+        ${regionMapMarkup(state, opts.desk)}
       </div>
-      <div class="place-copy">
-        <p class="lbl">${state.travel ? 'In transit' : 'You stand in'}</p>
-        <h2 class="place-title">${regionCrest(state.travel ? state.travel.to : (state.region ?? 'vale'))}${placeHereLabel(state)}</h2>
-        <p class="place-mood">${placeMood(state)}</p>
-        <p class="place-voice">${placeVoice(state)}</p>
-        ${opts.energyHtml}
-      </div>
-      ${regionMapMarkup(state, opts.desk)}
       ${opts.goalHtml}
       ${here ? opts.harvestHtml : ''}
     </section>`;
