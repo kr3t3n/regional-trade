@@ -31,6 +31,7 @@ import {
   CARGO_UPGRADE,
   TIMBER_BRACE_COST,
   recipeNeeds,
+  travelSeconds,
 } from './game';
 import { saveGame, loadGame, resetGame, clearSave } from './persist';
 import { HELP_KEY, SAVE_KEY } from './config';
@@ -44,6 +45,16 @@ import {
   startTutorial,
   syncTutorial,
 } from './tutorial';
+import {
+  deskForTarget,
+  placeCopyHasForbidden,
+  placeSceneMarkup,
+  regionMapMarkup,
+  showTimberFork,
+  timberForkGrainCargo,
+  timberForkLeg,
+  timberForkMarkup,
+} from './place';
 
 function installMemoryStorage() {
   const store = new Map<string, string>();
@@ -354,6 +365,100 @@ export function honestyReport(): string[] {
   if (/honesty|free travel/i.test(FIELD_NOTES_CRAFT) || /honesty|free travel/i.test(notes)) {
     errors.push('Field notes must not spoil honesty suite');
   }
+  if (!notes.includes('You are the only one here')) {
+    errors.push('Field notes maps must mark only you');
+  }
+  if (!/this region's map marks you/i.test(notes)) {
+    errors.push('Field notes maps should mention the region map stub');
+  }
+
+  errors.push(...placeCopyHasForbidden());
+  const scene = placeSceneMarkup(createInitialState(), {
+    desk: 'none',
+    energyHtml: '',
+    goalHtml: '',
+    harvestHtml: '',
+    coachVale: true,
+  });
+  if (!/Vale Fields/.test(scene) || !/Low fields/.test(scene)) {
+    errors.push('first paint must stand in Vale Fields');
+  }
+  if (/<table/i.test(scene)) {
+    errors.push('place scene must not be a market table');
+  }
+  if (!/You are the only one here/.test(scene)) {
+    errors.push('region map must mark only you');
+  }
+  if ((scene.match(/class="map-you"/g) || []).length !== 1) {
+    errors.push('region map must have exactly one You marker');
+  }
+  if (/Alice|Player 2|other trader|who's here besides/i.test(scene)) {
+    errors.push('region map must not invent multiplayer presence');
+  }
+  const map = regionMapMarkup(createInitialState(), 'none');
+  if (!/Fields/.test(map) || !/Stall/.test(map) || !/Road/.test(map)) {
+    errors.push('region map stub needs harvest / market / road nodes');
+  }
+
+  const ridgeFork = timberForkLeg('ridge');
+  const crossFork = timberForkLeg('cross');
+  if (Math.abs(ridgeFork.sellGrain - npcBuyPrice('ridge', 'grain')) > 1e-9) {
+    errors.push('Ridge fork grain sale must come from live config');
+  }
+  if (Math.abs(ridgeFork.buyTimber - npcSellPrice('ridge', 'timber')) > 1e-9) {
+    errors.push('Ridge fork timber buy must come from live config');
+  }
+  if (ridgeFork.seconds !== travelSeconds('vale', 'ridge')) {
+    errors.push('Ridge fork time must be Vale↔Ridge');
+  }
+  if (crossFork.seconds !== travelSeconds('vale', 'cross')) {
+    errors.push('Cross fork time must be Vale↔Cross');
+  }
+  if (ridgeFork.grainCargo !== timberForkGrainCargo('ridge')) {
+    errors.push('Ridge grain cargo must follow live spreads');
+  }
+  if (crossFork.grainCargo !== timberForkGrainCargo('cross')) {
+    errors.push('Cross grain cargo must follow live spreads');
+  }
+  if (ridgeFork.grainCargo !== 27 || crossFork.grainCargo !== 35) {
+    errors.push(
+      `current brace fork cargo should be ~27 Ridge / ~35 Cross, got ${ridgeFork.grainCargo}/${crossFork.grainCargo}`
+    );
+  }
+  if (ridgeFork.spend !== 'time' || crossFork.spend !== 'grain') {
+    errors.push('Ridge spends time; Cross spends grain');
+  }
+  const freshFork = createInitialState();
+  if (showTimberFork(freshFork)) errors.push('timber fork must wait for the brace gate');
+  freshFork.workbenchCrafted = true;
+  if (!showTimberFork(freshFork)) errors.push('timber fork should open with the brace gate in Vale');
+  freshFork.region = 'ridge';
+  if (showTimberFork(freshFork)) errors.push('timber fork is a Vale destination picker');
+  freshFork.region = 'vale';
+  freshFork.timberBraceCrafted = true;
+  if (showTimberFork(freshFork)) errors.push('timber fork should close after the brace');
+  const forkHtml = timberForkMarkup('ridge');
+  if (!/1\.05/.test(forkHtml) || !/1\.3/.test(forkHtml) || !/0\.7/.test(forkHtml) || !/1\.15/.test(forkHtml)) {
+    errors.push('timber fork should show live grain/timber quotes');
+  }
+  if (!/~27/.test(forkHtml) || !/~35/.test(forkHtml) || !/25s/.test(forkHtml) || !/20s/.test(forkHtml)) {
+    errors.push('timber fork should show grain cargo and road time');
+  }
+  if (!/spends grain/i.test(forkHtml) || !/spends time/i.test(forkHtml)) {
+    errors.push('timber fork must say grain vs time');
+  }
+  if (/fibre|global board|1:1/i.test(forkHtml)) {
+    errors.push('timber fork must not be a global price board');
+  }
+  if (deskForTarget('market') !== 'trade' || deskForTarget('travel') !== 'travel' || deskForTarget('craft') !== 'craft') {
+    errors.push('tutorial desks must still open trade / pack / craft');
+  }
+  if (deskForTarget('vale') !== null || deskForTarget('harvest') !== null) {
+    errors.push('place/harvest coach must not force a ledger desk');
+  }
+  if ('npcBooks' in createInitialState()) {
+    errors.push('must not include #31 npcBooks stock drift');
+  }
 
   const walk = createInitialState();
   if (!walk.tutorial.splash || walk.tutorial.step !== 0) {
@@ -550,4 +655,4 @@ if (errors.length) {
   console.error('Honesty failed:\n' + errors.map((e) => ` - ${e}`).join('\n'));
   throw new Error('honesty');
 }
-console.log('Honesty ok: Vale cannot harvest ore or timber; Workbench then Timber brace; cargo +5 only after brace; paid cart stacks on current cap; Ridge ore 1.3P; no transit idle; no arrival full-tick credit.');
+console.log('Honesty ok: Vale cannot harvest ore or timber; Workbench then Timber brace; cargo +5 only after brace; paid cart stacks on current cap; Ridge ore 1.3P; no transit idle; no arrival full-tick credit; place scene + timber fork + region map you-only.');

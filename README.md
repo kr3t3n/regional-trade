@@ -2,6 +2,8 @@
 
 Playable one-loop prototype: **harvest local → travel → trade with NPC → craft Workbench → haul timber → craft Timber brace**.
 
+First paint is the place you stand in (Vale Fields / Ridge Heights / Cross Way) — scene, traveler, and a region map that marks only you. Market quotes, cargo amounts, and coin live in **Trade at the stall**, **Pack the road**, and **The bench**. When Timber brace is the open gate, Pack shows a Ridge vs Cross grain-vs-time fork (not a global board).
+
 Constants match `REGIONAL-TRADE.md` (V1 constants). All numbers live in `src/config.ts`. No invented 1:1 NPC, no player books, no AI traders.
 
 ## Run locally
@@ -68,11 +70,11 @@ No server routes, no environment variables, no DNS changes required.
 2. Stock ~50 grain: **leave 20 at home** for the craft, pay fee **2 grain**, carry **~28 grain** (cargo cap 40).
 3. **Direct (intended):** destination **Ridge**, Depart (25s).  
    **Two-hop tutorial:** Vale → **Cross** (20s) → Ridge (20s). No extra buildings; Cross is only a waypoint.
-4. At Ridge, open the **NPC market**. Change **Amount** — each row’s sell/buy **total** updates live (`amount × /ea`). Confirm **Sell** / **Buy** uses that same total (coin only; no barter). Sell grain (foreign buy **1.05P**). Buy ore — ore is local to Ridge so NPC sell is **1.3P** (not Travian 1:1). 28 grain → 29.4 coin → 22 ore.
+4. At Ridge, open **Trade at the stall**. Change **Amount** — each row’s sell/buy **total** updates live (`amount × /ea`). Confirm **Sell** / **Buy** uses that same total (coin only; no barter). Sell grain (foreign buy **1.05P**). Buy ore — ore is local to Ridge so NPC sell is **1.3P** (not Travian 1:1). 28 grain → 29.4 coin → 22 ore.
 5. Keep 2 ore (or timber) for the return fee. Depart Vale with **20 ore** in cargo.
 6. In Vale, craft **Workbench** (20 grain left at home + 20 ore). The complete screen says the bench stands and the next board wants timber — foreign in Vale. Cargo cap stays **40**.
-7. Haul **20 timber** home (Ridge harvest or buy abroad). Leave **15 grain** in the Vale stash. Craft **Timber brace**. That spend cannot finish from Vale harvest. Cargo cap becomes **45**.
-8. **Cargo upgrades** (Travel panel): current cap, next +5 cost (coin + a local good here), Buy. Paid tiers stack on the current cap — brace then paid → 50, or paid then brace → 50. Travel still wants fee + packing.
+7. Haul **20 timber** home (Ridge harvest or buy abroad). With Timber brace open, **Pack the road** compares Ridge (sell grain 1.05, buy timber 1.3, 25s, ~27 grain cargo) vs Cross (sell grain 0.7, buy timber 1.15, 20s, ~35 grain cargo) — same 20 timber; one spends grain, the other spends time. Leave **15 grain** in the Vale stash. Craft **Timber brace**. That spend cannot finish from Vale harvest. Cargo cap becomes **45**.
+8. **Cargo upgrades** (Pack the road): current cap, next +5 cost (coin + a local good here), Buy. Paid tiers stack on the current cap — brace then paid → 50, or paid then brace → 50. Travel still wants fee + packing.
 
 Honesty: cannot craft Workbench without leaving Vale (ore is foreign there); cannot craft Timber brace without timber (also foreign in Vale); idle pauses in transit; arrival tick does not grant a full idle slice; NPC spreads stay in `src/config.ts`.
 
@@ -83,7 +85,8 @@ Honesty: cannot craft Workbench without leaving Vale (ore is foreign there); can
 | `src/config.ts` | All V1 numbers (regions, harvest, energy, travel, NPC spreads, Workbench, Timber brace, cargo upgrades, save key) |
 | `src/game.ts` | State + tick + actions |
 | `src/persist.ts` | localStorage save/load/reset (no offline catch-up) |
-| `src/main.ts` | One-screen UI (NPC totals = amount × unit, live) |
+| `src/main.ts` | Place-first UI (NPC totals = amount × unit, live; numbers in drawers) |
+| `src/place.ts` | Place mood, region map stub, Timber brace travel fork |
 | `src/help.ts` | Toggleable Field notes + localStorage pref |
 | `src/tutorial.ts` | Splash + T0–T8 first-trip coach |
 | `src/mission.ts` | Workbench / Timber brace why-copy |

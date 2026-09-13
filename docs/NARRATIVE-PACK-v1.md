@@ -46,6 +46,8 @@ The old `createInitialState` route dump is gone. The log opens on the T0 one-lin
 
 Optional region labels: Vale Fields / Ridge Heights / Cross Way.
 
+Place scene (first paint): standing in the region, not a ledger. Mood — Vale: Low fields. Soft fibre. Grain underfoot. Ridge: Stone and sawdust. Heights, not a market hall. Cross: A way-station, not a capital. Market, cargo amounts, and coin wait in Trade / Pack / Craft drawers. Region map stub marks you; no one else stands here.
+
 ## Field notes
 
 - **Harvest.** Click +1 local while you stand there. Idle +0.2/s × node in-region only — quiet on the road. Energy 30, regen 1 / 2s.
@@ -54,7 +56,7 @@ Optional region labels: Vale Fields / Ridge Heights / Cross Way.
 - **NPC spreads.** Coin only; amount × unit. Local buy 0.7P / sell 1.3P. Foreign buy 1.05P / sell 1.15P. Ridge ore 1.3. No 1:1. No global board.
 - **Coin.** Only from NPC sales.
 - **Craft gates.** Workbench: 20 grain + 20 ore in *this* stash. First reason to leave home — Vale cannot harvest ore. After it stands, the next recipe still spends timber (foreign in Vale), plus cargo +5. Next: timber brace — still a foreign spend in Vale. Workbench was the first haul; this one proves the loop.
-- **Maps / boards.** Three region stashes are the map. You are the only one here.
+- **Maps / boards.** This region's map marks you. You are the only one here. Three stashes still hold the goods. No global board.
 
 ## Log examples
 

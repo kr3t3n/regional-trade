@@ -74,7 +74,7 @@ export function helperMarkup(): string {
         </div>
         <div>
           <dt>Maps / boards</dt>
-          <dd>Three region stashes are the map. You are the only one here.</dd>
+          <dd>This region's map marks you. You are the only one here. Three stashes still hold the goods. No global board.</dd>
         </div>
       </dl>
     </aside>`;
