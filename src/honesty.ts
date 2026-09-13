@@ -1,6 +1,6 @@
 /**
- * Honesty checks for the Workbench gate. Run: npx tsx src/honesty.ts
- * Vale cannot harvest ore; craft needs travel; NPC spreads stay in config.
+ * Honesty checks for the Workbench + Timber brace gates. Run: npx tsx src/honesty.ts
+ * Vale cannot harvest ore or timber; crafts need travel; NPC spreads stay in config.
  */
 import {
   createInitialState,
@@ -8,6 +8,10 @@ import {
   harvestClick,
   canCraftWorkbench,
   craftWorkbench,
+  canCraftTimberBrace,
+  craftTimberBrace,
+  canDepart,
+  cargoCap,
   tick,
   depart,
   sellToNpc,
@@ -20,10 +24,13 @@ import {
   TRAVEL,
   NEXT_RECIPE_NEEDS,
   WORKBENCH_UNLOCK_CARGO,
+  TIMBER_BRACE_COST,
+  recipeNeeds,
 } from './game';
 import { saveGame, loadGame, resetGame, clearSave } from './persist';
-import { HELP_KEY } from './config';
-import { loadHelpOpen, saveHelpOpen } from './help';
+import { HELP_KEY, SAVE_KEY } from './config';
+import { helperMarkup, loadHelpOpen, saveHelpOpen } from './help';
+import { FIELD_NOTES_CRAFT, MISSION } from './mission';
 import {
   T0_LOG,
   TUTORIAL_STEPS,
@@ -61,6 +68,11 @@ export function honestyReport(): string[] {
   if (REGIONS.vale.foreign.includes('ore') === false) errors.push('ore must be foreign in Vale');
   if (canHarvest(vale, 'ore')) errors.push('canHarvest(ore) true in Vale');
   if (harvestClick(vale, 'ore')) errors.push('harvestClick(ore) succeeded in Vale');
+  if (REGIONS.vale.local.includes('timber')) errors.push('Vale must not harvest timber');
+  if (REGIONS.vale.foreign.includes('timber') === false) errors.push('timber must be foreign in Vale');
+  if (canHarvest(vale, 'timber')) errors.push('canHarvest(timber) true in Vale');
+  if (harvestClick(vale, 'timber')) errors.push('harvestClick(timber) succeeded in Vale');
+  if (!REGIONS.ridge.local.includes('timber')) errors.push('Ridge must grow timber for the brace haul');
 
   vale.stashes.vale.grain = 99;
   vale.energy = HARVEST.energyCap;
@@ -129,12 +141,62 @@ export function honestyReport(): string[] {
   if (!craftWorkbench(crafted) || !crafted.workbenchCrafted) {
     errors.push('craft Workbench failed with 20/20 in Vale');
   }
-  if (TRAVEL.cargoCap !== 40 || WORKBENCH_UNLOCK_CARGO !== 5) {
-    errors.push('Workbench must not apply cargo +5 until #7 (cap stays 40)');
+  if (TRAVEL.cargoCap !== 40) errors.push(`cargo cap base ${TRAVEL.cargoCap} ≠ 40`);
+  if (WORKBENCH_UNLOCK_CARGO !== 5) errors.push(`brace cargo unlock ${WORKBENCH_UNLOCK_CARGO} ≠ 5`);
+  if (cargoCap(crafted) !== 40) {
+    errors.push('Workbench must not apply cargo +5 (cap stays 40 until brace)');
   }
   if (!REGIONS.vale.foreign.includes(NEXT_RECIPE_NEEDS)) {
     errors.push('next recipe must still spend a Vale-foreign good');
   }
+  if (!recipeNeeds(TIMBER_BRACE_COST).some(([g]) => g === NEXT_RECIPE_NEEDS)) {
+    errors.push('Timber brace recipe must spend timber');
+  }
+  if (!recipeNeeds(TIMBER_BRACE_COST).some(([g]) => REGIONS.vale.local.includes(g))) {
+    errors.push('Timber brace should also spend a Vale-local good in this stash');
+  }
+  if (canCraftTimberBrace(createInitialState()) === null) {
+    errors.push('Timber brace craftable before Workbench');
+  }
+  const earlyBrace = createInitialState();
+  earlyBrace.stashes.vale.grain = 15;
+  earlyBrace.stashes.vale.timber = 20;
+  if (canCraftTimberBrace(earlyBrace) === null) {
+    errors.push('Timber brace craftable before Workbench with materials');
+  }
+  crafted.stashes.vale.grain = 99;
+  crafted.stashes.vale.fibre = 99;
+  if (canCraftTimberBrace(crafted) === null) {
+    errors.push('Timber brace craftable in Vale with only local goods');
+  }
+  crafted.stashes.vale.grain = 15;
+  crafted.stashes.vale.timber = 20;
+  if (canCraftTimberBrace(crafted) !== null) {
+    errors.push(`Vale with workbench + brace recipe should craft, got: ${canCraftTimberBrace(crafted)}`);
+  }
+  if (!craftTimberBrace(crafted) || !crafted.timberBraceCrafted) {
+    errors.push('craft Timber brace failed with grain/timber in Vale');
+  }
+  if (cargoCap(crafted) !== 45) {
+    errors.push(`Timber brace should raise cargo cap to 45, got ${cargoCap(crafted)}`);
+  }
+  if (TRAVEL.cargoCap !== 40) errors.push('TRAVEL.cargoCap must stay the base 40');
+
+  const tight = createInitialState();
+  tight.stashes.vale.grain = 50;
+  const overBase = canDepart(tight, {
+    to: 'ridge',
+    cargo: { grain: 41, ore: 0, timber: 0, fibre: 0 },
+    feeGood: 'grain',
+  });
+  if (!overBase) errors.push('base cap 40 should reject 41 cargo');
+  tight.timberBraceCrafted = true;
+  const overBrace = canDepart(tight, {
+    to: 'ridge',
+    cargo: { grain: 41, ore: 0, timber: 0, fibre: 0 },
+    feeGood: 'grain',
+  });
+  if (overBrace) errors.push(`brace cap 45 should allow 41 cargo, got: ${overBrace}`);
 
   // Sell/buy spreads: not 1:1. Confirm = amount × unit (coin only, no barter).
   const m = createInitialState();
@@ -170,6 +232,28 @@ export function honestyReport(): string[] {
   }
   if (/honesty/i.test(TUTORIAL_STEPS[4].html)) {
     errors.push('T4 must not say honesty');
+  }
+  if (!/timber brace/i.test(TUTORIAL_STEPS[8].html)) {
+    errors.push('T8 should point at timber brace');
+  }
+  if (/honesty|1:1|global board|free travel/i.test(TUTORIAL_STEPS[8].html)) {
+    errors.push('T8 must not spoil honesty suite');
+  }
+  if (MISSION.workbench.why !== 'First reason to leave home — ore is not local here.') {
+    errors.push('Workbench why-copy drifted from Fable');
+  }
+  if (MISSION.timberBrace.why !== 'Keeps you on the road — timber does not grow in Vale.') {
+    errors.push('Timber brace why-copy drifted from Fable');
+  }
+  const notes = helperMarkup();
+  if (!notes.includes('First reason to leave home')) {
+    errors.push('Field notes craft missing Workbench why-copy');
+  }
+  if (!/timber brace/i.test(notes)) {
+    errors.push('Field notes craft missing timber brace');
+  }
+  if (/honesty|free travel/i.test(FIELD_NOTES_CRAFT) || /honesty|free travel/i.test(notes)) {
+    errors.push('Field notes must not spoil honesty suite');
   }
 
   const walk = createInitialState();
@@ -245,6 +329,20 @@ export function honestyReport(): string[] {
   if (walk.log[0] !== 'Workbench stands in Vale.') {
     errors.push(`craft log should be Workbench stands in Vale, got: ${walk.log[0]}`);
   }
+  if (cargoCap(walk) !== 40) errors.push('first-trip Workbench must leave cargo cap at 40');
+  if (canCraftTimberBrace(walk) === null) {
+    errors.push('Timber brace craftable after Workbench without timber');
+  }
+  walk.stashes.vale.grain = 15;
+  walk.stashes.vale.timber = 20;
+  if (!craftTimberBrace(walk) || !walk.timberBraceCrafted) {
+    errors.push('second-trip walk failed to craft Timber brace');
+  }
+  if (walk.tutorial.step !== 8) errors.push('brace craft should leave T8 as complete');
+  if (walk.log[0] !== 'Timber brace set in Vale.') {
+    errors.push(`brace log should be Timber brace set in Vale, got: ${walk.log[0]}`);
+  }
+  if (cargoCap(walk) !== 45) errors.push('Timber brace must raise cargo cap to 45');
 
   dismissTutorial(walk);
   if (!walk.tutorial.dismissed) errors.push('Got it should dismiss the coach');
@@ -282,6 +380,28 @@ export function honestyReport(): string[] {
     if (!loaded.tutorial.dismissed || loaded.tutorial.step !== 3) {
       errors.push('persist lost tutorial dismiss / step');
     }
+    if (loaded.timberBraceCrafted) errors.push('persist invented timber brace');
+  }
+  const bracedSave = createInitialState();
+  bracedSave.workbenchCrafted = true;
+  bracedSave.timberBraceCrafted = true;
+  bracedSave.tutorial.splash = false;
+  bracedSave.tutorial.dismissed = true;
+  bracedSave.tutorial.step = 8;
+  saveGame(bracedSave);
+  const bracedLoaded = loadGame();
+  if (!bracedLoaded?.timberBraceCrafted || cargoCap(bracedLoaded) !== 45) {
+    errors.push('persist lost timber brace / cargo +5');
+  }
+  const raw = localStorage.getItem(SAVE_KEY);
+  if (raw) {
+    const parsed = JSON.parse(raw) as { timberBraceCrafted?: boolean };
+    delete parsed.timberBraceCrafted;
+    localStorage.setItem(SAVE_KEY, JSON.stringify(parsed));
+    const migrated = loadGame();
+    if (migrated?.timberBraceCrafted) {
+      errors.push('legacy save without brace flag should load brace off');
+    }
   }
   const reset = resetGame();
   if (reset.stashes.vale.grain !== 0 || reset.energy !== HARVEST.energyCap) {
@@ -304,4 +424,4 @@ if (errors.length) {
   console.error('Honesty failed:\n' + errors.map((e) => ` - ${e}`).join('\n'));
   throw new Error('honesty');
 }
-console.log('Honesty ok: Vale cannot harvest ore; Workbench needs travel; Ridge ore 1.3P; no transit idle; no arrival full-tick credit.');
+console.log('Honesty ok: Vale cannot harvest ore or timber; Workbench then Timber brace; cargo +5 only after brace; Ridge ore 1.3P; no transit idle; no arrival full-tick credit.');

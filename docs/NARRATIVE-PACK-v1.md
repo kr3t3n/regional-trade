@@ -1,6 +1,6 @@
 # Narrative pack v1
 
-Voice and first-trip copy for Regional trade. Numbers stay in `src/config.ts` — this file is lore, mood, and chrome only.
+Voice and first-trip copy for Regional trade. Numbers stay in `src/config.ts` — this file is lore, mood, and chrome only. Mission why-copy (goal chip / complete / Field notes craft) also lives in `docs/MISSION-WHY-v1.md`.
 
 Tone: dry, practical, weather-bitten. Prefer haul / wait verbs. Coin from sales — no barter. Do not say “honesty.” Do not promise free travel, a global board, or a 1:1 swap.
 
@@ -27,7 +27,7 @@ One at a time. Coach mark plus the T0 log line. **Got it** dismisses the coach f
 | T5 Ridge | Standing in Ridge | Sell grain for coin. Buy ore. Ridge grows ore — expect the local sell price. Totals = amount × each. |
 | T6 Return | Ore bought or packed for home | Keep fee goods for the return. Carry **20 ore** back to Vale. |
 | T7 Craft | 20 ore sitting in the Vale stash | Goods must sit in *this* stash. Craft the Workbench. |
-| T8 Complete | Workbench built | Built. Next board still wants timber (foreign here) — another trip later. Field notes stay under Help. |
+| T8 Complete | Workbench built | Built. Next: timber brace — still a foreign spend here. Another trip later. Field notes stay under Help. |
 
 The old `createInitialState` route dump is gone. The log opens on the T0 one-liner; the driver moves the coach.
 
@@ -40,7 +40,9 @@ The old `createInitialState` route dump is gone. The log opens on the T0 one-lin
 - Market: Coin only. Sell for coin, buy with coin. No barter.
 - Travel: Fee in a local good. Cargo cap holds. Idle waits at home.
 - Craft locked: Ore is not local in Vale. Finish a Ridge trip (or Cross→Ridge), then craft here.
-- Craft done: Workbench built. Next recipe board + cargo +5 or local craft speed (promised). Next recipe still spends timber — foreign in Vale.
+- Workbench why: First reason to leave home — ore is not local here.
+- Craft done: Workbench built. Bench stands. Next board wants timber — foreign in Vale — so another trip. Cargo +5 unlocks with that board. Chip muted: Next: timber on the road.
+- Second craft: Timber brace. Why: Keeps you on the road — timber does not grow in Vale. Complete: Brace set. Foreign timber earned its place. Cargo +5 is yours. More gates will ask for what home will not grow.
 
 Optional region labels: Vale Fields / Ridge Heights / Cross Way.
 
@@ -48,10 +50,10 @@ Optional region labels: Vale Fields / Ridge Heights / Cross Way.
 
 - **Harvest.** Click +1 local while you stand there. Idle +0.2/s × node in-region only — quiet on the road. Energy 30, regen 1 / 2s.
 - **Travel.** Fee 2 local. Nowhere while moving. Vale↔Ridge 25s; via Cross 20s+20s. Cancel burns fee; cargo comes home. No teleport.
-- **Cargo.** Cap 40. Leave 20 grain in Vale if Workbench still open.
+- **Cargo.** Cap 40 until timber brace, then 45. Leave 20 grain in Vale if Workbench still open.
 - **NPC spreads.** Coin only; amount × unit. Local buy 0.7P / sell 1.3P. Foreign buy 1.05P / sell 1.15P. Ridge ore 1.3. No 1:1. No global board.
 - **Coin.** Only from NPC sales.
-- **Craft gates.** Workbench 20 grain + 20 ore in *this* stash. Next recipe still timber foreign in Vale.
+- **Craft gates.** Workbench: 20 grain + 20 ore in *this* stash. First reason to leave home — Vale cannot harvest ore. After it stands, the next recipe still spends timber (foreign in Vale), plus cargo +5. Next: timber brace — still a foreign spend in Vale. Workbench was the first haul; this one proves the loop.
 - **Maps / boards.** Three region stashes are the map. You are the only one here.
 
 ## Log examples
@@ -61,6 +63,7 @@ Optional region labels: Vale Fields / Ridge Heights / Cross Way.
 - Sold N grain.
 - Bought N ore.
 - Workbench stands in Vale.
+- Timber brace set in Vale.
 
 Cancel: Turned back. Fee burned. Cargo returned to Vale.
 

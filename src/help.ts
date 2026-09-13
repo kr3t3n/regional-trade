@@ -1,11 +1,12 @@
 import {
-  GOOD_LABEL,
   HARVEST,
   HELP_KEY,
-  NEXT_RECIPE_NEEDS,
   NPC,
   TRAVEL,
+  WORKBENCH_COST,
+  WORKBENCH_UNLOCK_CARGO,
 } from './config';
+import { FIELD_NOTES_CRAFT } from './mission';
 
 /**
  * Missing pref stores off and stays closed. The first-trip walk owns
@@ -56,7 +57,7 @@ export function helperMarkup(): string {
         </div>
         <div>
           <dt>Cargo</dt>
-          <dd>Cap ${TRAVEL.cargoCap}. Leave 20 grain in Vale if Workbench still open.</dd>
+          <dd>Cap ${TRAVEL.cargoCap} until timber brace, then ${TRAVEL.cargoCap + WORKBENCH_UNLOCK_CARGO}. Leave ${WORKBENCH_COST.grain} grain in Vale if Workbench still open.</dd>
         </div>
         <div>
           <dt>NPC spreads</dt>
@@ -68,7 +69,7 @@ export function helperMarkup(): string {
         </div>
         <div>
           <dt>Craft gates</dt>
-          <dd>Workbench 20 grain + 20 ore in <em>this</em> stash. Next recipe still ${GOOD_LABEL[NEXT_RECIPE_NEEDS].toLowerCase()} foreign in Vale.</dd>
+          <dd>${FIELD_NOTES_CRAFT}</dd>
         </div>
         <div>
           <dt>Maps / boards</dt>
