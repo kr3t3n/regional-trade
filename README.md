@@ -1,3 +1,5 @@
+> **Frozen** at `dcbdf65` — see [STATUS.md](./STATUS.md). Live: https://pepelyankov.com/games/trade/
+
 # Regional Trade — solo browser v1
 
 Playable one-loop prototype: **harvest local → travel → trade with NPC → craft Workbench → haul timber → craft Timber brace**.
