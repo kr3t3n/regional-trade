@@ -16,6 +16,11 @@ import {
   cargoUpgradeCost,
   canBuyCargoUpgrade,
   buyCargoUpgrade,
+  nodeUpgradeCost,
+  upgradeNode,
+  nodeUpgradeCostAmount,
+  nodeClickAmount,
+  nodeIdlePerSecond,
   tick,
   depart,
   sellToNpc,
@@ -60,6 +65,7 @@ import {
 } from './haul';
 import {
   deskForTarget,
+  harvestNodesMarkup,
   placeCopyHasForbidden,
   placeSceneMarkup,
   regionMapMarkup,
@@ -162,6 +168,104 @@ export function honestyReport(): string[] {
   tick(idleTrip, 2);
   if (idleTrip.stashes.vale.grain !== g0) {
     errors.push('idle ran while in transit');
+  }
+
+  const level1Cost = nodeUpgradeCostAmount(1);
+  const level2Cost = nodeUpgradeCostAmount(2);
+  if (Math.abs(level1Cost - 10 * Math.pow(1.15, 1)) > 1e-9) {
+    errors.push(`node cost at level 1 must be 10 × 1.15^1, got ${level1Cost}`);
+  }
+  if (Math.abs(level2Cost - 10 * Math.pow(1.15, 2)) > 1e-9) {
+    errors.push(`node cost at level 2 must be 10 × 1.15^2, got ${level2Cost}`);
+  }
+  if (Math.abs(level2Cost / level1Cost - 1.15) > 1e-9) {
+    errors.push('node upgrade cost must grow by 1.15 each level');
+  }
+  if (nodeClickAmount(1) !== HARVEST.clickAmount) {
+    errors.push('level 1 click must stay the base click');
+  }
+  if (Math.abs(nodeIdlePerSecond(1) - HARVEST.idlePerSecond) > 1e-9) {
+    errors.push('level 1 idle must stay +0.2/s');
+  }
+  if (nodeClickAmount(2) !== HARVEST.clickAmount * 2) {
+    errors.push('click must scale with node level');
+  }
+  if (Math.abs(nodeIdlePerSecond(3) - HARVEST.idlePerSecond * 3) > 1e-9) {
+    errors.push('idle must scale with node level');
+  }
+
+  const nodes = createInitialState();
+  if (nodeUpgradeCost(nodes, 'grain') !== level1Cost) {
+    errors.push('Vale grain upgrade must use the config cost at the current level');
+  }
+  if (upgradeNode(nodes, 'ore') || upgradeNode(nodes, 'timber')) {
+    errors.push('Vale must not upgrade ore or timber nodes');
+  }
+  if (nodes.nodes.vale.grain !== 1) errors.push('failed foreign upgrade changed the grain node');
+  nodes.stashes.vale.grain = level1Cost - 0.05;
+  nodes.stashes.vale.fibre = 4;
+  if (upgradeNode(nodes, 'grain')) errors.push('upgrade must refuse a short stash');
+  if (nodes.nodes.vale.grain !== 1) errors.push('short upgrade changed the node level');
+  nodes.stashes.vale.grain = level1Cost;
+  if (!upgradeNode(nodes, 'grain') || nodes.nodes.vale.grain !== 2) {
+    errors.push('grain upgrade should spend the local good and raise the node');
+  }
+  if (nodes.stashes.vale.grain > 1e-6) errors.push('upgrade must spend the grain cost');
+  if (Math.abs(nodes.stashes.vale.fibre - 4) > 1e-9) {
+    errors.push('grain upgrade must not spend fibre');
+  }
+  nodes.energy = 5;
+  const beforeClick = nodes.stashes.vale.grain;
+  if (!harvestClick(nodes, 'grain')) errors.push('upgraded grain node should still harvest');
+  if (Math.abs(nodes.stashes.vale.grain - (beforeClick + nodeClickAmount(2))) > 1e-9) {
+    errors.push('click yield must follow the new node level');
+  }
+  const beforeIdle = nodes.stashes.vale.grain;
+  tick(nodes, 1);
+  const idleGain = nodes.stashes.vale.grain - beforeIdle;
+  if (Math.abs(idleGain - nodeIdlePerSecond(2)) > 1e-6) {
+    errors.push(`idle must scale to level 2, got ${idleGain}`);
+  }
+  nodes.stashes.vale.grain = 40;
+  if (
+    !depart(nodes, {
+      to: 'ridge',
+      cargo: { grain: 5, ore: 0, timber: 0, fibre: 0 },
+      feeGood: 'grain',
+    })
+  ) {
+    errors.push('depart after node upgrade failed');
+  }
+  const parkedGrain = nodes.stashes.vale.grain;
+  tick(nodes, 3);
+  if (Math.abs(nodes.stashes.vale.grain - parkedGrain) > 1e-9) {
+    errors.push('upgraded node still idled in transit');
+  }
+  if (upgradeNode(nodes, 'grain') || nodes.nodes.vale.grain !== 2) {
+    errors.push('node upgrade must wait until you stand in the region');
+  }
+
+  const strip = harvestNodesMarkup('Vale', 'Ore or Timber', [
+    {
+      good: 'grain',
+      regionId: 'vale',
+      have: '11.5',
+      level: 1,
+      click: '1',
+      idle: '0.2',
+      cost: '11.5',
+      afford: true,
+    },
+  ]);
+  if (/<table/i.test(strip)) errors.push('harvest nodes must not be a ledger');
+  if (!/data-node-level="grain">1</.test(strip) || !/data-node-cost="grain">11\.5</.test(strip)) {
+    errors.push('harvest nodes must show level and next cost');
+  }
+  if (!/cannot harvest Ore or Timber/.test(strip)) {
+    errors.push('harvest nodes must say Vale cannot harvest ore or timber');
+  }
+  if (!/data-act="upgrade" data-good="grain"/.test(strip)) {
+    errors.push('harvest nodes need an upgrade control');
   }
 
   const crafted = createInitialState();
@@ -374,6 +478,9 @@ export function honestyReport(): string[] {
   }
   if (!/paid upgrade/i.test(notes)) {
     errors.push('Field notes cargo missing paid upgrades');
+  }
+  if (!/1\.15\^level/.test(notes)) {
+    errors.push('Field notes should state the node upgrade curve');
   }
   if (/honesty|free travel/i.test(FIELD_NOTES_CRAFT) || /honesty|free travel/i.test(notes)) {
     errors.push('Field notes must not spoil honesty suite');
@@ -699,6 +806,9 @@ export function honestyReport(): string[] {
   }
   if (reset.cargoUpgrades !== 0 || cargoCap(reset) !== 40) {
     errors.push('reset must clear paid cargo upgrades back to cap 40');
+  }
+  if (reset.nodes.vale.grain !== 1 || reset.nodes.ridge.timber !== 1 || reset.nodes.cross.ore !== 1) {
+    errors.push('reset must restore node levels to 1');
   }
   if (!reset.tutorial.splash || reset.tutorial.step !== 0 || reset.tutorial.dismissed) {
     errors.push('reset must restart splash + T0–T8');
