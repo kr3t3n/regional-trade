@@ -19,6 +19,8 @@ import {
   upgradeNode,
   nodeUpgradeCost,
   nodeLevel,
+  nodeClickAmount,
+  nodeIdlePerSecond,
   GOODS,
   GOOD_LABEL,
   REGION_IDS,
@@ -55,6 +57,7 @@ import {
 import { MISSION } from './mission';
 import {
   deskBarMarkup,
+  harvestNodesMarkup,
   placeEnergyLine,
   placeSceneMarkup,
   showTimberFork,
@@ -97,6 +100,13 @@ mountHelper();
 function fmt(n: number): string {
   if (Math.abs(n - Math.round(n)) < 1e-6) return String(Math.round(n));
   return n.toFixed(1);
+}
+
+/** Upgrade prices follow 10 × 1.15^n and are not always one decimal. */
+function fmtCost(n: number): string {
+  const rounded = Math.round(n * 1000) / 1000;
+  if (Math.abs(rounded - Math.round(rounded)) < 1e-9) return String(Math.round(rounded));
+  return String(rounded);
 }
 
 function regionLabel(): string {
@@ -351,39 +361,25 @@ function destPicker(region: (typeof REGIONS)[RegionId], destinations: RegionId[]
             </label>`;
 }
 
-function harvestScene(
-  region: (typeof REGIONS)[RegionId],
-  stash: Inventory,
-  mark: string
-): string {
-  return `
-          <section class="panel harvest${mark === 'harvest' ? ' coach-target' : ''}">
-            <h2>${panelMark('harvest')} Harvest <span class="muted">local only</span></h2>
-            <p class="hint">Click +${HARVEST.clickAmount} local while you stand here. Idle +${HARVEST.idlePerSecond}/s × node — quiet on the road. Energy regen 1 / ${HARVEST.energyRegenSeconds}s.</p>
-            <div class="row">
-              ${region.local
-                .map((g) => {
-                  const lv = nodeLevel(state, region.id, g);
-                  const cost = nodeUpgradeCost(state, g);
-                  const can = canHarvest(state, g);
-                  return `
-                  <div class="card">
-                    <div class="card-top">${goodIcon(g)} ${GOOD_LABEL[g]} <strong data-stash="${region.id}" data-inv="${g}">${fmt(stash[g])}</strong></div>
-                    <button type="button" data-act="harvest" data-good="${g}" ${can ? '' : 'disabled'}>
-                      Harvest
-                    </button>
-                    <div class="meta">Node lv ${lv} · idle ${fmt(HARVEST.idlePerSecond * lv)}/s</div>
-                    <button type="button" class="sec" data-act="upgrade" data-good="${g}" ${
-                      cost !== null && stash[g] >= cost ? '' : 'disabled'
-                    }>
-                      Upgrade (${cost !== null ? fmt(cost) : '—'} ${GOOD_LABEL[g]})
-                    </button>
-                  </div>`;
-                })
-                .join('')}
-            </div>
-            <p class="hint foreign-note">${region.name} cannot harvest ${region.foreign.map((g) => GOOD_LABEL[g]).join(' or ')}.</p>
-          </section>`;
+function harvestStrip(region: (typeof REGIONS)[RegionId], stash: Inventory): string {
+  return harvestNodesMarkup(
+    region.name,
+    region.foreign.map((g) => GOOD_LABEL[g]).join(' or '),
+    region.local.map((g) => {
+      const level = nodeLevel(state, region.id, g);
+      const cost = nodeUpgradeCost(state, g);
+      return {
+        good: g,
+        regionId: region.id,
+        have: fmt(stash[g]),
+        level,
+        click: fmt(nodeClickAmount(level)),
+        idle: fmt(nodeIdlePerSecond(level)),
+        cost: cost === null ? '—' : fmtCost(cost),
+        afford: cost !== null && stash[g] + 1e-9 >= cost,
+      };
+    })
+  );
 }
 
 function tradeDrawer(region: (typeof REGIONS)[RegionId], mark: string): string {
@@ -506,8 +502,6 @@ function render() {
     : 0;
 
   const mark = coachTarget(state);
-  const haulOn = !state.tutorial.dismissed && !state.workbenchCrafted;
-  document.body.classList.toggle('haul-on', haulOn);
 
   app.innerHTML = `
     <div class="wrap${desk === 'none' ? ' drawers-shut' : ''}">
@@ -530,7 +524,7 @@ function render() {
         desk,
         energyHtml: placeEnergyLine(state.energy, HARVEST.energyCap, energyPct),
         goalHtml: goalBlock(),
-        harvestHtml: inRegion && region && stash && !haulOn ? harvestScene(region, stash, mark) : '',
+        harvestHtml: inRegion && region && stash ? harvestStrip(region, stash) : '',
         coachVale: mark === 'vale',
         verbHtml: state.tutorial.splash ? '' : verbMarkup(state),
         beatHtml: coachMarkup(state),
@@ -612,7 +606,9 @@ function paintLive() {
     const g = btn.dataset.good as Good;
     const cost = nodeUpgradeCost(state, g);
     const stash = state.region ? state.stashes[state.region] : null;
-    btn.disabled = cost === null || !stash || stash[g] < cost;
+    const afford = cost !== null && !!stash && stash[g] + 1e-9 >= cost;
+    btn.disabled = !afford;
+    btn.closest('.node-card')?.classList.toggle('ready', afford);
   });
   const cargoUpBtn = app.querySelector<HTMLButtonElement>('button[data-act="cargo-upgrade"]');
   const cargoUpErr = canBuyCargoUpgrade(state, upgradeGood);

@@ -50,7 +50,7 @@ export function helperMarkup(): string {
       <dl>
         <div>
           <dt>Harvest</dt>
-          <dd>Click +${HARVEST.clickAmount} local while you stand there. Idle +${HARVEST.idlePerSecond}/s × node in-region only — quiet on the road. Energy ${HARVEST.energyCap}, regen 1 / ${HARVEST.energyRegenSeconds}s.</dd>
+          <dd>Click +${HARVEST.clickAmount} × node level while you stand there. Idle +${HARVEST.idlePerSecond}/s × level, in-region only — quiet on the road. Upgrade spends ${HARVEST.nodeUpgradeBase} × ${HARVEST.nodeUpgradeGrowth}^level of that local good. Energy ${HARVEST.energyCap}, regen 1 / ${HARVEST.energyRegenSeconds}s.</dd>
         </div>
         <div>
           <dt>Travel</dt>

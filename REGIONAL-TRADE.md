@@ -71,7 +71,8 @@ Cross exists so there is a two-hop later; v1 only needs Vale ↔ Ridge. [I]
 - Idle: **+0.2/s** per unlocked local node while the tab is open **and** you are in that region. Idle **pauses in transit**.
 - Energy: **30** clicks, regen **1 / 2s**. Stops infinite click-print before the first trip.
 - Offline: none in v1 (or cap 5 min). Offline + travel is how bots win.
-- Node upgrade cost: `10 × 1.15^n` of **that** local good. Classic idle curve. [O] Young.
+- Node upgrade cost: `10 × 1.15^n` of **that** local good (`n` = current level; nodes start at 1). Classic idle curve. [O] Young.
+- That spend multiplies the node's click and idle by its level (`+1 × level`, `+0.2/s × level`). Level 1 is the base. Idle still pauses in transit.
 
 ### Why you leave [I]
 First craft / stall upgrade: **Workbench**, cost `20 grain + 20 ore`.

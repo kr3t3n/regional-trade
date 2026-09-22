@@ -66,7 +66,7 @@ No server routes, no environment variables, no DNS changes required.
 
 ## Playtest the Workbench loop
 
-1. Spawn in **Vale**. Click **Grain** (Vale cannot harvest ore). Energy: 30 clicks, regen 1 / 2s. Idle +0.2/s × node level while in-region (pauses in transit).
+1. Spawn in **Vale**. Click **Grain** (Vale cannot harvest ore or timber). Energy: 30 clicks, regen 1 / 2s. Idle +0.2/s × node level while in-region (pauses in transit). On the place, each local node shows its level and the next upgrade: **10 × 1.15^level** of that good. Click and idle scale with the new level. Spending grain on the node is the alternative to saving it for the fee and cargo.
 2. Stock ~50 grain: **leave 20 at home** for the craft, pay fee **2 grain**, carry **~28 grain** (cargo cap 40).
 3. **Direct (intended):** destination **Ridge**, Depart (25s).  
    **Two-hop tutorial:** Vale → **Cross** (20s) → Ridge (20s). No extra buildings; Cross is only a waypoint.
@@ -82,7 +82,7 @@ Honesty: cannot craft Workbench without leaving Vale (ore is foreign there); can
 
 | Path | Role |
 |---|---|
-| `src/config.ts` | All V1 numbers (regions, harvest, energy, travel, NPC spreads, Workbench, Timber brace, cargo upgrades, save key) |
+| `src/config.ts` | All V1 numbers (regions, harvest, node upgrades, energy, travel, NPC spreads, Workbench, Timber brace, cargo upgrades, save key) |
 | `src/game.ts` | State + tick + actions |
 | `src/persist.ts` | localStorage save/load/reset (no offline catch-up) |
 | `src/main.ts` | Place-first UI (NPC totals = amount × unit, live; numbers in drawers) |

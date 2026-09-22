@@ -12,6 +12,9 @@ import {
   CARGO_UPGRADE,
   cargoUpgradeCoinCost,
   cargoUpgradeGoodCost,
+  nodeUpgradeCostAmount,
+  nodeClickAmount,
+  nodeIdlePerSecond,
   TICK_HZ,
   SAVE_KEY,
   OFFLINE_CATCHUP_SECONDS,
@@ -140,7 +143,8 @@ export function canHarvest(state: GameState, good: Good): boolean {
 export function harvestClick(state: GameState, good: Good): boolean {
   if (!canHarvest(state, good)) return false;
   const stash = currentStash(state)!;
-  stash[good] += HARVEST.clickAmount;
+  const level = nodeLevel(state, state.region!, good);
+  stash[good] += nodeClickAmount(level);
   state.energy -= 1;
   return true;
 }
@@ -154,16 +158,16 @@ export function nodeUpgradeCost(state: GameState, good: Good): number | null {
   const region = REGIONS[state.region];
   if (!region.local.includes(good)) return null;
   const n = nodeLevel(state, state.region, good);
-  // cost for next level: 10 × 1.15^n where n is current owned/level
-  return HARVEST.nodeUpgradeBase * Math.pow(HARVEST.nodeUpgradeGrowth, n);
+  return nodeUpgradeCostAmount(n);
 }
 
 export function upgradeNode(state: GameState, good: Good): boolean {
   const cost = nodeUpgradeCost(state, good);
   if (cost === null || !state.region) return false;
   const stash = currentStash(state)!;
-  if (stash[good] < cost) return false;
+  if (stash[good] + 1e-9 < cost) return false;
   stash[good] -= cost;
+  if (stash[good] < 1e-9) stash[good] = 0;
   state.nodes[state.region][good] = (state.nodes[state.region][good] ?? 0) + 1;
   pushLog(state, `Upgraded ${good} node in ${REGIONS[state.region].name} (lv ${state.nodes[state.region][good]}).`);
   return true;
@@ -210,9 +214,7 @@ export function tickIdle(state: GameState, dt: number) {
   for (const good of region.local) {
     const level = nodeLevel(state, state.region, good);
     if (level <= 0) continue;
-    // each unlocked node at level contributes; notebook: +0.2/s per unlocked local node
-    // level starts at 1; upgrades increase production proportionally
-    stash[good] += HARVEST.idlePerSecond * level * dt;
+    stash[good] += nodeIdlePerSecond(level) * dt;
   }
 }
 
@@ -471,6 +473,9 @@ export {
   CARGO_UPGRADE,
   cargoUpgradeCoinCost,
   cargoUpgradeGoodCost,
+  nodeUpgradeCostAmount,
+  nodeClickAmount,
+  nodeIdlePerSecond,
   recipeNeeds,
   recipeLabel,
   TICK_HZ,

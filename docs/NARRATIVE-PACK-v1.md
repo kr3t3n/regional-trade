@@ -50,7 +50,7 @@ Place scene (first paint, especially phone-width): standing in the region, not a
 
 ## Field notes
 
-- **Harvest.** Click +1 local while you stand there. Idle +0.2/s × node in-region only — quiet on the road. Energy 30, regen 1 / 2s.
+- **Harvest.** Click +1 × node level while you stand there. Idle +0.2/s × level, in-region only — quiet on the road. Upgrade spends 10 × 1.15^level of that local good. Energy 30, regen 1 / 2s.
 - **Travel.** Fee 2 local. Nowhere while moving. Vale↔Ridge 25s; via Cross 20s+20s. Cancel burns fee; cargo comes home. No teleport.
 - **Cargo.** Cap 40 until timber brace, then 45. Paid upgrades add +5 each on the current cap — coin plus a local good in this stash. Leave 20 grain in Vale if Workbench still open.
 - **NPC spreads.** Coin only; amount × unit. Local buy 0.7P / sell 1.3P. Foreign buy 1.05P / sell 1.15P. Ridge ore 1.3. No 1:1. No global board.

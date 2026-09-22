@@ -51,10 +51,28 @@ export const HARVEST = {
   energyCap: 30,
   /** 1 energy every 2 seconds */
   energyRegenSeconds: 2,
-  /** Node upgrade cost: 10 × 1.15^n of that local good */
+  /**
+   * Node upgrade cost: 10 × 1.15^n of that local good.
+   * n = current level (nodes start at 1). Young idle curve.
+   */
   nodeUpgradeBase: 10,
   nodeUpgradeGrowth: 1.15,
 } as const;
+
+/** 10 × 1.15^n of that local good. n = current level. */
+export function nodeUpgradeCostAmount(level: number): number {
+  return HARVEST.nodeUpgradeBase * Math.pow(HARVEST.nodeUpgradeGrowth, level);
+}
+
+/** Click yield scales with node level. Level 1 stays +1. */
+export function nodeClickAmount(level: number): number {
+  return HARVEST.clickAmount * level;
+}
+
+/** Idle per second scales with node level. Level 1 stays +0.2/s. */
+export function nodeIdlePerSecond(level: number): number {
+  return HARVEST.idlePerSecond * level;
+}
 
 /** Travel times in seconds */
 export const TRAVEL_SECONDS: Record<string, number> = {

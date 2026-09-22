@@ -3,16 +3,18 @@
  * Voice: dry, practical, weather-bitten. Numbers stay in config.ts.
  */
 import {
+  GOOD_LABEL,
   REGIONS,
   TIMBER_BRACE_COST,
   TRAVEL,
   npcBuyPrice,
   npcSellPrice,
   travelSeconds,
+  type Good,
   type RegionId,
 } from './config';
 import type { GameState } from './game';
-import { regionCrest } from './icons';
+import { goodIcon, regionCrest } from './icons';
 
 export type DeskId = 'none' | 'trade' | 'travel' | 'craft';
 
@@ -265,6 +267,46 @@ export function placeKind(state: GameState): RegionId | 'transit' {
   return state.region ?? 'vale';
 }
 
+export interface HarvestNodeView {
+  good: Good;
+  regionId: RegionId;
+  have: string;
+  level: number;
+  click: string;
+  idle: string;
+  cost: string;
+  afford: boolean;
+}
+
+/** Local nodes on the place scene: level, rates, next cost. Not a ledger. */
+export function harvestNodesMarkup(
+  regionName: string,
+  foreignLabels: string,
+  rows: HarvestNodeView[]
+): string {
+  return `
+    <div class="node-strip" aria-label="Local harvest nodes">
+      ${rows
+        .map(
+          (row) => `
+        <article class="node-card${row.afford ? ' ready' : ''}" data-node="${row.good}">
+          <div class="node-card-top">
+            ${goodIcon(row.good)}
+            <span>${GOOD_LABEL[row.good]}</span>
+            <strong data-stash="${row.regionId}" data-inv="${row.good}">${row.have}</strong>
+          </div>
+          <p class="node-rates">Lv <span data-node-level="${row.good}">${row.level}</span> · click +${row.click} · idle ${row.idle}/s</p>
+          <p class="node-next">Next · <span data-node-cost="${row.good}">${row.cost}</span> ${GOOD_LABEL[row.good]}</p>
+          <button type="button" class="node-up" data-act="upgrade" data-good="${row.good}" ${
+            row.afford ? '' : 'disabled'
+          }>Upgrade</button>
+        </article>`
+        )
+        .join('')}
+    </div>
+    <p class="node-foreign">${regionName} cannot harvest ${foreignLabels}.</p>`;
+}
+
 export function placeEnergyLine(energy: number, cap: number, pct: number): string {
   return `<div class="place-energy">
     <span class="lbl">Energy</span>
@@ -314,8 +356,8 @@ export function placeSceneMarkup(
         ${opts.travelHudHtml ?? ''}
       </div>
       ${opts.beatHtml ?? ''}
-      ${opts.verbHtml ?? ''}
       ${here ? `<div class="place-harvest-wall">${opts.harvestHtml}</div>` : ''}
+      ${opts.verbHtml ?? ''}
     </section>`;
 }
 
